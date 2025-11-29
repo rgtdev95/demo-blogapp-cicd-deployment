@@ -1,73 +1,75 @@
-# Welcome to your Lovable project
+# Frontend Integration Progress
 
-## Project info
 
-**URL**: https://lovable.dev/projects/e18444c6-c7e2-4ec1-88ca-ae68f0d83492
+### 5. Dependencies
+- Added `axios` to package.json
 
-## How can I edit this code?
+## 🔄 Next Steps (Remaining Work)
 
-There are several ways of editing your application.
+### Components to Update
 
-**Use Lovable**
+The following components still use mock data/localStorage and need to be updated to use the new API:
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/e18444c6-c7e2-4ec1-88ca-ae68f0d83492) and start prompting.
+1. **Dashboard** (`frontend/src/pages/Dashboard.tsx`)
+   - Replace `getBlogsFromLocalStorage()` with `getMyPosts()`
+   - Replace `deleteBlog()` with `deletePost()`
+   - Update Blog interface to match backend response
 
-Changes made via Lovable will be committed automatically to this repo.
+2. **Write** (`frontend/src/pages/Write.tsx`)
+   - Replace `saveBlog()` with `createPost()`
+   - Update data structure to match CreatePostData interface
 
-**Use your preferred IDE**
+3. **Edit** (`frontend/src/pages/Edit.tsx`)
+   - Replace `getBlogById()` with `getPost()`
+   - Replace `saveBlog()` with `updatePost()`
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+4. **Feed** (`frontend/src/pages/Feed.tsx`)
+   - Replace `getAllFeedBlogs()` with `getPosts()`
+   - Update FeedBlog interface to match Post interface
+   - Handle pagination response
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+5. **BlogPost** (`frontend/src/pages/BlogPost.tsx`)
+   - Replace `getFeedBlogById()` and `getUserBlogById()` with `getPost()`
+   - Use `toggleLike()` for like functionality
+   - Use `toggleBookmark()` for bookmark functionality
+   - Use `getPostComments()` and `addComment()` for comments
+   - Update Comment interface
 
-Follow these steps:
+6. **Profile** (`frontend/src/pages/Profile.tsx`)
+   - Use `useAuthStore().updateProfile()` for profile updates
+   - Use `changePassword()` API for password changes
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### Installation Required
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```bash
+cd frontend
+npm install
 ```
 
-**Edit a file directly in GitHub**
+This will install axios and update dependencies.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## 📝 Notes
 
-**Use GitHub Codespaces**
+- **User ID Type**: Changed from `string` to `number` to match backend
+- **Token Storage**: JWT token stored in Zustand persist (localStorage)
+- **OTP Development**: OTP code is logged to console during signup (remove in production)
+- **Error Handling**: All API calls wrapped in try-catch with console.error logging
+- **401 Handling**: Axios interceptor automatically clears auth and redirects to login
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## 🧪 Testing Checklist
 
-## What technologies are used for this project?
+After updating components:
 
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/e18444c6-c7e2-4ec1-88ca-ae68f0d83492) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- [ ] Test registration flow (signup → verify OTP → login)
+- [ ] Test login with existing user
+- [ ] Test creating a new blog post
+- [ ] Test editing a blog post
+- [ ] Test deleting a blog post
+- [ ] Test viewing public feed
+- [ ] Test adding comments
+- [ ] Test liking/unliking posts
+- [ ] Test bookmarking posts
+- [ ] Test profile updates
+- [ ] Test password change
+- [ ] Test logout
+- [ ] Test protected routes (should redirect to login when not authenticated)
