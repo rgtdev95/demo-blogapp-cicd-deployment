@@ -1,0 +1,4 @@
+# Development-related files
+node_modules/ # For Node.js projects
+venv/         # For Python virtual environments
+.env          # Environment variables
