@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     # Application
     DEBUG: bool = True
     API_PREFIX: str = "/api"
+    PORT: int = 8000
     
     @property
     def cors_origins_list(self) -> List[str]:
