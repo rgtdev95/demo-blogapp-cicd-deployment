@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  backend:
+    build: .
+    container_name: blogapp-backend
+    env_file:
+      - .env
+    entrypoint: ["./entrypoint.sh"]
+    command: ["gunicorn", "app.main:app", "-c", "gunicorn.conf.py"]
+    ports:
+      - "${BACKEND_PORT}:8000"
+    # Remove the environment section since we're using env_file
+    environment:
+      - DATABASE_URL=mysql+aiomysql://${MYSQL_USER}:${MYSQL_PASSWORD}@blogapp_mysql:3306/${MYSQL_DATABASE}
+    volumes:
+      - ./uploads:/home/app/uploads
+      - ./logs:/home/app/logs
+    networks:
+      - blogapp_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  blogapp_network:
+    external: true

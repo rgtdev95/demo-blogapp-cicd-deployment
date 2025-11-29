@@ -1,0 +1,24 @@
+# Development-related files
+node_modules/ 
+venv/
+.env
+
+# Docker
+.dockerignore
+
+# Logs
+logs/
+*.log
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+tmp/
+temp/
+
+# OS generated files
+.DS_Store
+Thumbs.db
