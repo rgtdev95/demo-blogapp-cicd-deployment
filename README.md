@@ -413,15 +413,3 @@ docker compose logs -f
 ### API Testing
 
 Use Swagger UI at http://localhost/api/docs for interactive API testing.
-
-## 📝 License
-
-[Add your license here]
-
-## 🤝 Contributing
-
-[Add contribution guidelines here]
-
-## 📧 Contact
-
-[Add contact information here]
