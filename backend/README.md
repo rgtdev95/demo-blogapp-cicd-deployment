@@ -272,3 +272,169 @@ backend/
 - The API runs on port 8000 by default
 - CORS is configured for frontend at http://localhost:5173
 - Debug mode is enabled in development
+
+## Docker Deployment
+
+### Prerequisites
+
+1. **Create the shared Docker network** (if not already created):
+```bash
+docker network create blogapp_network
+```
+
+2. **Start the database services** (MySQL and phpMyAdmin):
+```bash
+cd ../docker-apps/database
+docker compose up -d
+```
+
+Wait for MySQL to be healthy:
+```bash
+docker ps  # Check that blogapp_mysql shows "healthy" status
+```
+
+### Running the Backend Container
+
+1. **Configure environment variables:**
+
+Copy `.env.example` to `.env` and update the values:
+```bash
+cp env.example .env
+```
+
+**Important:** The `.env` file should contain:
+```env
+# Database - Use container name for Docker networking
+DATABASE_URL=mysql+aiomysql://blogapp_user:blogapp_pass@blogapp_mysql:3306/blogapp_db
+
+# JWT Authentication
+SECRET_KEY=your-secret-key-change-this-in-production-min-32-chars
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# CORS - Add your frontend URLs
+CORS_ORIGINS=http://localhost:8081,http://localhost:5173
+
+# Application
+DEBUG=True
+API_PREFIX=/api
+PORT=8000
+BACKEND_PORT=8000
+
+# MySQL credentials (must match database compose.yml)
+MYSQL_USER=blogapp_user
+MYSQL_PASSWORD=blogapp_pass
+MYSQL_DATABASE=blogapp_db
+```
+
+2. **Build the Docker image:**
+```bash
+docker compose build
+```
+
+3. **Start the backend container:**
+```bash
+docker compose up -d
+```
+
+4. **Check logs:**
+```bash
+docker compose logs -f backend
+# or
+docker logs -f blogapp-backend
+```
+
+You should see:
+```
+Creating database tables...
+✅ Database tables created successfully!
+Starting server...
+```
+
+### Verify the Backend is Running
+
+1. **Check container status:**
+```bash
+docker ps | grep blogapp-backend
+```
+
+2. **Test the health endpoint:**
+```bash
+curl http://localhost:8000/health
+```
+
+3. **Access API documentation:**
+- Swagger UI: http://localhost:8000/api/docs
+- ReDoc: http://localhost:8000/api/redoc
+
+### Container Management
+
+**Stop the backend:**
+```bash
+docker compose down
+```
+
+**Restart the backend:**
+```bash
+docker compose restart
+```
+
+**Rebuild after code changes:**
+```bash
+docker compose build --no-cache
+docker compose up -d
+```
+
+**View real-time logs:**
+```bash
+docker compose logs -f
+```
+
+### Network Configuration
+
+The backend container is connected to `blogapp_network` and can communicate with:
+- `blogapp_mysql` - MySQL database (port 3306)
+- `blogapp_phpmyadmin` - phpMyAdmin (port 80)
+- `blogapp-frontend` - Frontend container (port 80)
+- `blogapp-nginx` - NGINX reverse proxy (port 80/443)
+
+### Troubleshooting
+
+**Backend keeps restarting:**
+- Check if MySQL is healthy: `docker ps`
+- Verify `.env` has correct database credentials
+- Check logs: `docker logs blogapp-backend`
+
+**Can't connect to database:**
+- Ensure `DATABASE_URL` uses `blogapp_mysql` as the host (not `localhost`)
+- Verify both containers are on `blogapp_network`: `docker ps --format "table {{.Names}}\t{{.Networks}}"`
+
+**Port conflicts:**
+- Check if port 8000 is already in use: `lsof -i :8000`
+- Change `BACKEND_PORT` in `.env` if needed
+
+### Environment Variables Reference
+
+Required in `.env`:
+- `DATABASE_URL` - Full MySQL connection string (use `blogapp_mysql` as host)
+- `SECRET_KEY` - JWT signing key (generate with `openssl rand -hex 32`)
+- `MYSQL_USER` - Database username
+- `MYSQL_PASSWORD` - Database password
+- `MYSQL_DATABASE` - Database name
+- `BACKEND_PORT` - Port to expose (default: 8000)
+- `CORS_ORIGINS` - Comma-separated list of allowed origins
+
+### Volumes
+
+The following directories are mounted as volumes:
+- `./uploads:/home/app/uploads` - Persistent storage for uploaded files
+- `./logs:/home/app/logs` - Application logs
+
+### Health Checks
+
+The container includes automatic health checks:
+- Endpoint: `http://localhost:8000/health`
+- Interval: 30 seconds
+- Timeout: 10 seconds
+- Retries: 3
+- Start period: 40 seconds
