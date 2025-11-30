@@ -108,6 +108,9 @@ jobs:
           pip install -r requirements-dev.txt
       
       - name: Run tests with coverage
+        env:
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+          SECRET_KEY: "test_secret_key_for_ci_pipeline"
         run: pytest -v --cov=app --cov-report=term-missing --cov-report=xml
       
       - name: Upload coverage reports
