@@ -229,7 +229,27 @@ jobs:
           
       - name: Build Frontend Image
         run: docker build -f ./frontend/.Dockerfile -t blogapp-frontend:test ./frontend
-          
+        
+      - name: Check Backend Image Size
+        run: |
+          SIZE=$(docker image inspect blogapp-backend:test --format='{{.Size}}')
+          LIMIT=$((300 * 1024 * 1024))  # 300MB
+          echo "Backend Image Size: $SIZE bytes"
+          if [ "$SIZE" -gt "$LIMIT" ]; then
+            echo "❌ Backend image exceeds 300MB limit"
+            exit 1
+          fi
+
+      - name: Check Frontend Image Size
+        run: |
+          SIZE=$(docker image inspect blogapp-frontend:test --format='{{.Size}}')
+          LIMIT=$((200 * 1024 * 1024))  # 200MB
+          echo "Frontend Image Size: $SIZE bytes"
+          if [ "$SIZE" -gt "$LIMIT" ]; then
+            echo "❌ Frontend image exceeds 200MB limit"
+            exit 1
+          fi
+
       - name: Scan Backend Image
         uses: aquasecurity/trivy-action@master
         with:
