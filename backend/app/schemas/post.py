@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List
 from datetime import datetime
+from typing import List, Optional
+
+from pydantic import BaseModel, Field
 
 
 class TagBase(BaseModel):
@@ -9,7 +10,7 @@ class TagBase(BaseModel):
 
 class TagResponse(TagBase):
     id: int
-    
+
     class Config:
         from_attributes = True
 
@@ -44,7 +45,7 @@ class AuthorInfo(BaseModel):
     id: int
     name: str
     avatar: Optional[str] = None
-    
+
     class Config:
         from_attributes = True
 
@@ -59,7 +60,7 @@ class PostResponse(PostBase):
     updated_at: datetime
     likes_count: int = 0
     comments_count: int = 0
-    
+
     class Config:
         from_attributes = True
 

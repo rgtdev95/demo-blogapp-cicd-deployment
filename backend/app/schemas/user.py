@@ -1,6 +1,7 @@
-from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
 from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel, EmailStr, Field
 
 
 # User Schemas
@@ -24,7 +25,7 @@ class UserResponse(UserBase):
     bio: Optional[str] = None
     is_verified: int
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
 
