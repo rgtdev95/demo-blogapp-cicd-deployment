@@ -1,15 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 from typing import List
 
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
 from app.database import get_db
-from app.schemas.comment import CommentCreate, CommentResponse
+from app.dependencies import get_current_active_user
 from app.models.comment import Comment
 from app.models.post import Post
 from app.models.user import User
-from app.dependencies import get_current_active_user
+from app.schemas.comment import CommentCreate, CommentResponse
 
 router = APIRouter()
 

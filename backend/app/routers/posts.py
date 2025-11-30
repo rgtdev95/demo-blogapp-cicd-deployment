@@ -1,19 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, or_, and_
-from sqlalchemy.orm import selectinload
-from typing import List, Optional
-from datetime import datetime
 import re
+from datetime import datetime
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import and_, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.schemas.post import PostCreate, PostUpdate, PostResponse, PostListResponse, AuthorInfo
-from app.models.post import Post
-from app.models.user import User
-from app.models.tag import Tag, post_tags
-from app.models.like import Like
-from app.models.comment import Comment
 from app.dependencies import get_current_active_user
+from app.models.comment import Comment
+from app.models.like import Like
+from app.models.post import Post
+from app.models.tag import Tag, post_tags
+from app.models.user import User
+from app.schemas.post import AuthorInfo, PostCreate, PostListResponse, PostResponse, PostUpdate
 
 router = APIRouter()
 

@@ -1,15 +1,16 @@
+import random
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from datetime import datetime, timedelta
-import random
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.schemas.user import UserCreate, UserResponse, UserLogin, Token, OTPVerify, UserUpdate, PasswordChange
-from app.models.user import User
-from app.utils.auth import get_password_hash, verify_password, create_access_token
 from app.dependencies import get_current_active_user
+from app.models.user import User
+from app.schemas.user import OTPVerify, PasswordChange, Token, UserCreate, UserLogin, UserResponse, UserUpdate
+from app.utils.auth import create_access_token, get_password_hash, verify_password
 
 router = APIRouter()
 

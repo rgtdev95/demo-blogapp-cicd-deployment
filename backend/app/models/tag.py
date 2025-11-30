@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Table, ForeignKey
+from sqlalchemy import Column, ForeignKey, Integer, String, Table
+
 from app.database import Base
 
 # Association table for post tags (many-to-many)

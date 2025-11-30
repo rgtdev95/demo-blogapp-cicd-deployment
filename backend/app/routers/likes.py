@@ -1,14 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
 from typing import Optional
 
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import and_, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.database import get_db
-from app.schemas.like import LikeResponse, BookmarkResponse, LikeStatus, BookmarkStatus
-from app.models.like import Like, Bookmark
+from app.dependencies import get_current_active_user
+from app.models.like import Bookmark, Like
 from app.models.post import Post
 from app.models.user import User
-from app.dependencies import get_current_active_user
+from app.schemas.like import BookmarkResponse, BookmarkStatus, LikeResponse, LikeStatus
 
 router = APIRouter()
 

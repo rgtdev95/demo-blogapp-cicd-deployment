@@ -1,9 +1,10 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, status
-from fastapi.responses import JSONResponse
-import shutil
 import os
+import shutil
 import uuid
 from typing import List
+
+from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi.responses import JSONResponse
 
 router = APIRouter()
 
