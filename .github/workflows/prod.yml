@@ -1,0 +1,9 @@
+name: Production Branch CI
+
+on:
+    push:
+        branches:
+            - main
+    pull_request:
+        branches:
+            - main
