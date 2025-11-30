@@ -34,19 +34,12 @@ if not os.path.exists("uploads"):
     os.makedirs("uploads")
 app.mount("/static/uploads", StaticFiles(directory="uploads"), name="static")
 
+
 @app.get("/")
 async def root():
-    return {
-        "message": "Blog App API",
-        "version": "1.0.0",
-        "docs": f"{settings.API_PREFIX}/docs"
-    }
+    return {"message": "Blog App API", "version": "1.0.0", "docs": f"{settings.API_PREFIX}/docs"}
 
 
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
-
-
-
-

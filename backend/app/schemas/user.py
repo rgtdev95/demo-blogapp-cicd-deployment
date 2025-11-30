@@ -24,7 +24,7 @@ class UserResponse(UserBase):
     bio: Optional[str] = None
     is_verified: int
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
 

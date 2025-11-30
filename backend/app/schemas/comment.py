@@ -16,7 +16,7 @@ class CommentAuthor(BaseModel):
     id: int
     name: str
     avatar: Optional[str] = None
-    
+
     class Config:
         from_attributes = True
 
@@ -27,6 +27,6 @@ class CommentResponse(CommentBase):
     author_id: int
     author: CommentAuthor
     created_at: datetime
-    
+
     class Config:
         from_attributes = True

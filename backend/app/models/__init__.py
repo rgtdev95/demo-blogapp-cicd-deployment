@@ -6,4 +6,3 @@ from app.models.comment import Comment
 from app.models.like import Like, Bookmark
 
 __all__ = ["User", "Post", "Tag", "post_tags", "Comment", "Like", "Bookmark"]
-
