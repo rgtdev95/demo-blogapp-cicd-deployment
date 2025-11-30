@@ -229,24 +229,37 @@ jobs:
           
       - name: Build Frontend Image
         run: docker build -f ./frontend/.Dockerfile -t blogapp-frontend:test ./frontend
-        
-      - name: Check Backend Image Size
+
+      - name: Check Image Sizes
         run: |
-          SIZE=$(docker image inspect blogapp-backend:test --format='{{.Size}}')
-          LIMIT=$((300 * 1024 * 1024))  # 300MB
-          echo "Backend Image Size: $SIZE bytes"
-          if [ "$SIZE" -gt "$LIMIT" ]; then
-            echo "❌ Backend image exceeds 300MB limit"
+          # Backend
+          BACKEND_BYTES=$(docker image inspect blogapp-backend:test --format='{{.Size}}')
+          BACKEND_MB=$(echo "scale=2; $BACKEND_BYTES/1024/1024" | bc)
+          
+          echo "Backend Image Size: ${BACKEND_BYTES} bytes (${BACKEND_MB} MB)"
+
+          # Frontend
+          FRONTEND_BYTES=$(docker image inspect blogapp-frontend:test --format='{{.Size}}')
+          FRONTEND_MB=$(echo "scale=2; $FRONTEND_BYTES/1024/1024" | bc)
+
+          echo "Frontend Image Size: ${FRONTEND_BYTES} bytes (${FRONTEND_MB} MB)"
+
+          # Size limits in MB
+          BACKEND_LIMIT_MB=300
+          FRONTEND_LIMIT_MB=150
+          
+          # Convert MB to bytes for comparison
+          BACKEND_LIMIT_BYTES=$((BACKEND_LIMIT_MB * 1024 * 1024))
+          FRONTEND_LIMIT_BYTES=$((FRONTEND_LIMIT_MB * 1024 * 1024))
+
+          # Validate
+          if [ "$BACKEND_BYTES" -gt "$BACKEND_LIMIT_BYTES" ]; then
+            echo "❌ Backend image exceeds ${BACKEND_LIMIT_MB} MB limit"
             exit 1
           fi
 
-      - name: Check Frontend Image Size
-        run: |
-          SIZE=$(docker image inspect blogapp-frontend:test --format='{{.Size}}')
-          LIMIT=$((200 * 1024 * 1024))  # 200MB
-          echo "Frontend Image Size: $SIZE bytes"
-          if [ "$SIZE" -gt "$LIMIT" ]; then
-            echo "❌ Frontend image exceeds 200MB limit"
+          if [ "$FRONTEND_BYTES" -gt "$FRONTEND_LIMIT_BYTES" ]; then
+            echo "❌ Frontend image exceeds ${FRONTEND_LIMIT_MB} MB limit"
             exit 1
           fi
 
