@@ -7,7 +7,7 @@ COPY . .
 RUN bun run build
 
 # Production stage  
-FROM nginx:1.27-alpine3.20
+FROM nginx:1.27-bookworm
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 EXPOSE 80
