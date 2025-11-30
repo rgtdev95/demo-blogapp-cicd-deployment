@@ -24,6 +24,14 @@ export default defineConfig({
                 "**/*.d.ts",
                 "**/index.ts",
             ],
+            thresholds: {
+                global: {
+                    lines: 50,
+                    functions: 50,
+                    branches: 50,
+                    statements: 50,
+                },
+            },
         },
     },
 });
