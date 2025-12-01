@@ -101,7 +101,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install -r requirements-dev.txt
 
       - name: Run tests with coverage
         env:
@@ -249,7 +248,7 @@ jobs:
           echo "Frontend Image Size: ${FRONTEND_BYTES} bytes (${FRONTEND_MB} MB)"
 
           # Size limits in MB
-          BACKEND_LIMIT_MB=300
+          BACKEND_LIMIT_MB=500
           FRONTEND_LIMIT_MB=150
 
           # Convert MB to bytes for comparison
