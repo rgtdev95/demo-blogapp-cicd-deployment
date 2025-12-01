@@ -33,6 +33,7 @@
         - logs
         - ssl
         - uploads
+        - nginx
 
     - name: Ensure uploads directory has correct permissions
       file:
@@ -82,7 +83,7 @@
           SECRET_KEY={{ secret_key }}
           ALGORITHM=HS256
           ACCESS_TOKEN_EXPIRE_MINUTES=30
-          CORS_ORIGINS=http://{{ DEV_SERVER_IP }},http://{{ DEV_SERVER_IP }}:8081
+          CORS_ORIGINS=http://{{ DEV_SERVER_IP }},http://{{ DEV_SERVER_IP }}:8081,https://dev-blogapp.internal.rtg-homelabs.tech/login
           DEBUG=True
           API_PREFIX=/api
           PORT=8000
@@ -107,9 +108,14 @@
       command: docker compose pull
       args:
         chdir: "{{ project_dir }}"
+    
+    - name: Stop existing containers
+      command: docker compose down
+      args:
+        chdir: "{{ project_dir }}"
 
-    - name: Stop and start services
-      command: docker compose down && docker compose up -d --remove-orphans
+    - name: Start containers
+      command: docker compose up -d --remove-orphans
       args:
         chdir: "{{ project_dir }}"
 
