@@ -56,7 +56,9 @@ jobs:
 
   deploy:
     needs: build-and-push-images
-    runs-on: ubuntu-latest
+    runs-on: self-hosted # ← CRITICAL: must be your on-premise runner
+    secrets: inherit # ← CRITICAL: gives the runner all repo secrets
+    timeout-minutes: 15 # ← nice to have
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python  Python
