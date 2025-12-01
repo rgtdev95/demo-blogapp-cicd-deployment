@@ -25,6 +25,7 @@
         - conf.d
         - logs
         - ssl
+        - nginx
 
     - name: Copy Docker Compose file
       copy:
