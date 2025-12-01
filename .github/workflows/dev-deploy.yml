@@ -40,7 +40,7 @@ jobs:
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/blogapp-frontend:dev
           build-args: |
-            VITE_API_URL=http://${{ secrets.DEV_SERVER_IP }}
+            VITE_API_URL=https://dev-blogapp.internal.rtg-homelabs.tech
             VITE_APP_ENV=production
 
       - name: Scan Backend Image
