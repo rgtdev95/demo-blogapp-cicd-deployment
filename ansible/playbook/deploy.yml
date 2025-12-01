@@ -25,6 +25,15 @@
         - conf.d
         - logs
         - ssl
+        - uploads
+
+    - name: Ensure uploads directory has correct permissions
+      file:
+        path: "{{ project_dir }}/uploads"
+        state: directory
+        mode: "0777" # Allow write access for container user (UID 1000)
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
 
     - name: Copy Docker Compose file
       copy:
