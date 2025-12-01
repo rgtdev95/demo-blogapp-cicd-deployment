@@ -101,8 +101,8 @@
       args:
         chdir: "{{ project_dir }}"
 
-    - name: Start services
-      command: docker compose up -d --remove-orphans
+    - name: Stop and start services
+      command: docker compose down && docker compose up -d --remove-orphans
       args:
         chdir: "{{ project_dir }}"
 
