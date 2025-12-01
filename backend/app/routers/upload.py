@@ -6,6 +6,8 @@ from typing import List
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
 from fastapi.responses import JSONResponse
 
+from app.config import settings
+
 router = APIRouter()
 
 UPLOAD_DIR = "uploads"
@@ -37,13 +39,8 @@ async def upload_file(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Could not save file: {str(e)}")
 
-    # Construct URL (assuming standard port 8000 and /static mount)
-    # In production, this should use the actual domain/CDN
-    # For now, we'll return a relative path or full URL based on request?
-    # Let's return the full URL assuming localhost for dev
-    # Ideally, the frontend should prepend the API_URL if we return a relative path.
-    # But to be safe and easy, let's return the path relative to the server root.
-
-    url = f"/static/uploads/{file_name}"
+    # Construct full URL using configured STATIC_URL
+    # This will be set to the domain in production (e.g., https://dev-blogapp.internal.rtg-homelabs.tech)
+    url = f"{settings.STATIC_URL}/static/uploads/{file_name}"
 
     return {"url": url, "filename": file_name}
