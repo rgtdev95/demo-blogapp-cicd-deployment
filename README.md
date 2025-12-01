@@ -449,13 +449,6 @@ docker compose logs -f
 
 ## 🧪 Testing
 
-### Manual Testing
-
-1. **Register a new user** at http://localhost
-2. **Verify OTP** (check browser console for OTP in development)
-3. **Create a blog post**
-4. **Test all features**: edit, delete, like, comment, bookmark
-
 ### API Testing
 
 Use Swagger UI at http://localhost/api/docs for interactive API testing.
