@@ -68,12 +68,6 @@ jobs:
       - name: Install Ansible
         run: pip install ansible
 
-      - name: Debug secrets (temporary!)
-        run: |
-          echo "DEV_SERVER_IP is: '${{ secrets.DEV_SERVER_IP }}'"
-          echo "Length: ${#DEV_SERVER_IP}"
-          echo "First char: '${{ secrets.DEV_SERVER_IP}}'"
-
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh/
