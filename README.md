@@ -29,6 +29,7 @@ A modern full-stack blog application with React frontend, FastAPI backend, MySQL
 ## 🚀 Tech Stack
 
 ### Frontend
+
 - **Framework**: React 18 + TypeScript
 - **Build Tool**: Vite
 - **UI Library**: shadcn/ui (Radix UI)
@@ -39,6 +40,7 @@ A modern full-stack blog application with React frontend, FastAPI backend, MySQL
 - **Editor**: TipTap (Rich Text)
 
 ### Backend
+
 - **Framework**: FastAPI
 - **ORM**: SQLAlchemy (Async)
 - **Database Driver**: aiomysql
@@ -47,6 +49,7 @@ A modern full-stack blog application with React frontend, FastAPI backend, MySQL
 - **Server**: Gunicorn + Uvicorn workers
 
 ### Infrastructure
+
 - **Database**: MySQL 8.0
 - **Reverse Proxy**: NGINX
 - **Containerization**: Docker + Docker Compose
@@ -55,6 +58,7 @@ A modern full-stack blog application with React frontend, FastAPI backend, MySQL
 ## 📋 Features
 
 ✅ **Authentication & Authorization**
+
 - User registration with OTP verification
 - JWT-based authentication
 - Protected routes and API endpoints
@@ -62,6 +66,7 @@ A modern full-stack blog application with React frontend, FastAPI backend, MySQL
 - Password change
 
 ✅ **Blog Management**
+
 - Create, edit, delete posts
 - Draft vs Published status
 - Rich text editor with formatting
@@ -71,20 +76,41 @@ A modern full-stack blog application with React frontend, FastAPI backend, MySQL
 - Pagination
 
 ✅ **Social Features**
+
 - Like/Unlike posts
 - Bookmark posts
 - Comments system
 - User profiles
 
 ✅ **Admin Tools**
+
 - phpMyAdmin for database management
 - API documentation (Swagger/ReDoc)
+
+## 🔄 CI/CD Pipeline
+
+The project includes a comprehensive CI/CD pipeline using GitHub Actions:
+
+- **Feature Branches**:
+
+  - 🔍 **Linting**: ESLint (Frontend), Flake8/Black/Isort/MyPy (Backend)
+  - 🧪 **Testing**: Vitest (Frontend), Pytest (Backend) with coverage requirements
+  - 🛡️ **Security**: Dependency scanning (`safety`, `npm audit`) and Docker image scanning (Trivy)
+  - 🐳 **Build**: Verifies Docker images build correctly
+
+- **Development Branch (`dev`)**:
+  - All checks from Feature Branches
+  - 📦 **Registry**: Pushes images to GitHub Container Registry (GHCR)
+  - 🚀 **Deployment**: Automatically deploys to the development server using Ansible
+
+For detailed documentation on testing and the pipeline, see [TESTING.md](TESTING.md) and [walkthrough.md](.gemini/antigravity/brain/89e00b4f-5b9a-4c8b-9533-a61f1be0e3c3/walkthrough.md).
 
 ## 🐳 Docker Deployment (Recommended)
 
 ### Prerequisites
 
 1. **Install Docker and Docker Compose**
+
    - [Docker Installation Guide](https://docs.docker.com/get-docker/)
 
 2. **Create the shared network**
@@ -95,23 +121,27 @@ A modern full-stack blog application with React frontend, FastAPI backend, MySQL
 ### Quick Start
 
 1. **Clone the repository**
+
    ```bash
    git clone <repository-url>
    cd demo-blogapp-cicd-deployment
    ```
 
 2. **Start the database**
+
    ```bash
    cd docker-apps/database
    docker compose up -d
    ```
 
    Wait for MySQL to be healthy:
+
    ```bash
    docker ps  # Check for "healthy" status
    ```
 
 3. **Start the backend**
+
    ```bash
    cd ../../backend
    cp env.example .env  # Configure if needed
@@ -120,6 +150,7 @@ A modern full-stack blog application with React frontend, FastAPI backend, MySQL
    ```
 
 4. **Start the frontend**
+
    ```bash
    cd ../frontend
    docker compose build
@@ -127,6 +158,7 @@ A modern full-stack blog application with React frontend, FastAPI backend, MySQL
    ```
 
 5. **Start NGINX**
+
    ```bash
    cd ../docker-apps/nginx
    docker compose up -d
@@ -159,6 +191,7 @@ docker ps --format "table {{.Names}}\t{{.Networks}}"
 ### Container Management
 
 **Stop all services:**
+
 ```bash
 # From project root
 docker compose -f docker-apps/nginx/docker-compose.yml down
@@ -168,12 +201,14 @@ docker compose -f docker-apps/database/compose.yml down
 ```
 
 **Restart a service:**
+
 ```bash
 cd <service-directory>
 docker compose restart
 ```
 
 **View logs:**
+
 ```bash
 docker logs -f blogapp-frontend
 docker logs -f blogapp-backend
@@ -181,6 +216,7 @@ docker logs -f blogapp-nginx
 ```
 
 **Rebuild after code changes:**
+
 ```bash
 cd <service-directory>
 docker compose build --no-cache
@@ -190,6 +226,7 @@ docker compose up -d
 ## 💻 Local Development (Without Docker)
 
 ### Prerequisites
+
 - Node.js 18+ or Bun
 - Python 3.10+
 - MySQL 8.0 (or use Docker for database only)
@@ -284,6 +321,7 @@ demo-blogapp-cicd-deployment/
 ### Environment Variables
 
 #### Backend (`.env`)
+
 ```env
 DATABASE_URL=mysql+aiomysql://blogapp_user:blogapp_pass@blogapp_mysql:3306/blogapp_db
 SECRET_KEY=<generate-with-openssl-rand-hex-32>
@@ -292,11 +330,13 @@ BACKEND_PORT=8000
 ```
 
 #### Frontend (`.env`)
+
 ```env
 VITE_API_URL=http://localhost:8000
 ```
 
 #### Database (`.env`)
+
 ```env
 MYSQL_ROOT_PASSWORD=rootpassword
 MYSQL_DATABASE=blogapp_db
@@ -309,6 +349,7 @@ MYSQL_PASSWORD=blogapp_pass
 All Docker containers communicate via `blogapp_network`:
 
 - **Container Names** (for Docker DNS):
+
   - `blogapp_mysql` - MySQL database
   - `blogapp_phpmyadmin` - phpMyAdmin
   - `blogapp-backend` - FastAPI backend
@@ -340,6 +381,7 @@ All Docker containers communicate via `blogapp_network`:
 ### SSL/TLS Setup
 
 1. Place certificates in `docker-apps/nginx/ssl/`:
+
    - `cert.pem`
    - `key.pem`
 
@@ -356,6 +398,7 @@ All Docker containers communicate via `blogapp_network`:
 ### Common Issues
 
 **Containers can't communicate:**
+
 ```bash
 # Verify all containers are on blogapp_network
 docker ps --format "table {{.Names}}\t{{.Networks}}"
@@ -365,16 +408,19 @@ docker network inspect blogapp_network
 ```
 
 **Backend can't connect to database:**
+
 - Ensure `DATABASE_URL` uses `blogapp_mysql` (not `localhost`)
 - Check MySQL is healthy: `docker ps`
 - Verify credentials match between backend and database
 
 **Frontend shows API errors:**
+
 - Check `VITE_API_URL` in `.env`
 - Rebuild frontend after changing `.env`: `docker compose build --no-cache`
 - Verify backend is running: `curl http://localhost:8000/health`
 
 **Port conflicts:**
+
 ```bash
 # Check what's using a port
 lsof -i :80
@@ -402,13 +448,6 @@ docker compose logs -f
 - [NGINX Documentation](docker-apps/nginx/README.md) - Reverse proxy configuration
 
 ## 🧪 Testing
-
-### Manual Testing
-
-1. **Register a new user** at http://localhost
-2. **Verify OTP** (check browser console for OTP in development)
-3. **Create a blog post**
-4. **Test all features**: edit, delete, like, comment, bookmark
 
 ### API Testing
 
