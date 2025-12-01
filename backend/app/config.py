@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     API_PREFIX: str = "/api"
     PORT: int = 8000
 
+    # Static Files URL (for image uploads)
+    STATIC_URL: str = "http://localhost"
+
     @property
     def cors_origins_list(self) -> List[str]:
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
