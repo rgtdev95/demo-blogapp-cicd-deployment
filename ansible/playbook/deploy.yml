@@ -1,0 +1,101 @@
+---
+- name: Deploy Blog App to Development Server
+  hosts: dev
+  become: true
+  vars:
+    project_dir: /opt/blogapp
+
+  tasks:
+    - name: Create project directory
+      file:
+        path: "{{ project_dir }}"
+        state: directory
+        mode: "0755"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+
+    - name: Create Nginx directories
+      file:
+        path: "{{ project_dir }}/{{ item }}"
+        state: directory
+        mode: "0755"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+      loop:
+        - conf.d
+        - logs
+        - ssl
+
+    - name: Copy Docker Compose file
+      copy:
+        src: ../../docker-compose.deploy.yml
+        dest: "{{ project_dir }}/docker-compose.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0644"
+
+    - name: Copy Nginx configuration
+      copy:
+        src: ../../docker-apps/nginx/nginx.conf
+        dest: "{{ project_dir }}/nginx/nginx.conf"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0644"
+
+    - name: Copy Nginx server configuration
+      copy:
+        src: ../../docker-apps/nginx/conf.d/default.conf
+        dest: "{{ project_dir }}/nginx/conf.d/default.conf"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0644"
+
+    - name: Create .env file from secrets
+      copy:
+        dest: "{{ project_dir }}/.env"
+        content: |
+          # Database Configuration
+          MYSQL_ROOT_PASSWORD={{ mysql_root_password }}
+          MYSQL_DATABASE={{ mysql_database }}
+          MYSQL_USER={{ mysql_user }}
+          MYSQL_PASSWORD={{ mysql_password }}
+          MYSQL_PORT=3306
+
+          # Backend Configuration
+          DATABASE_URL=mysql+aiomysql://{{ mysql_user }}:{{ mysql_password }}@blogapp_mysql:3306/{{ mysql_database }}
+          SECRET_KEY={{ secret_key }}
+          ALGORITHM=HS256
+          ACCESS_TOKEN_EXPIRE_MINUTES=30
+          CORS_ORIGINS=http://localhost:5173,http://localhost:3000,http://{{ dev_server_ip }}:8081,http://localhost:8081
+          DEBUG=True
+          API_PREFIX=/api
+          PORT=8000
+          BACKEND_PORT={{ backend_port }}
+
+          # PhpMyAdmin
+          PHPMYADMIN_PORT={{ phpmyadmin_port }}
+
+          # Docker
+          GITHUB_REPOSITORY_OWNER={{ github_repository_owner }}
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0600"
+
+    - name: Log in to GitHub Container Registry
+      community.docker.docker_login:
+        registry: ghcr.io
+        username: "{{ github_actor }}"
+        password: "{{ github_token }}"
+
+    - name: Pull latest images
+      command: docker compose pull
+      args:
+        chdir: "{{ project_dir }}"
+
+    - name: Start services
+      command: docker compose up -d --remove-orphans
+      args:
+        chdir: "{{ project_dir }}"
+
+    - name: Prune unused images
+      command: docker image prune -f
