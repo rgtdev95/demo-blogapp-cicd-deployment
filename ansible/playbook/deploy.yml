@@ -25,7 +25,6 @@
         - conf.d
         - logs
         - ssl
-        - nginx
 
     - name: Copy Docker Compose file
       copy:
@@ -46,7 +45,7 @@
     - name: Copy Nginx server configuration
       copy:
         src: ../../docker-apps/nginx/conf.d/default.conf
-        dest: "{{ project_dir }}/nginx/conf.d/default.conf"
+        dest: "{{ project_dir }}/conf.d/default.conf" # ← FIXED: goes into conf.d, not nginx/conf.d
         owner: "{{ ansible_user }}"
         group: "{{ ansible_user }}"
         mode: "0644"
