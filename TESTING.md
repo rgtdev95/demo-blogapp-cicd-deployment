@@ -61,7 +61,7 @@ class TestMyFeature:
     async def test_something(self, client: AsyncClient):
         """Test description."""
         response = await client.get("/api/endpoint")
-        
+
         assert response.status_code == 200
         assert response.json()["key"] == "expected_value"
 ```
@@ -75,7 +75,7 @@ async def test_authenticated_endpoint(client: AsyncClient):
     # Create and authenticate user
     user_data = await create_test_user(client)
     headers = await get_auth_headers(user_data["access_token"])
-    
+
     # Make authenticated request
     response = await client.get("/api/protected", headers=headers)
     assert response.status_code == 200
@@ -146,10 +146,10 @@ describe("MyComponent", () => {
   it("handles click events", async () => {
     const handleClick = vi.fn();
     render(<MyComponent onClick={handleClick} />);
-    
+
     const button = screen.getByRole("button");
     await userEvent.click(button);
-    
+
     expect(handleClick).toHaveBeenCalledOnce();
   });
 });
@@ -234,26 +234,31 @@ Coverage reports are generated for both backend and frontend:
 ### Backend
 
 **Tests fail with database errors:**
+
 - Ensure `aiosqlite` is installed
 - Check that `conftest.py` is properly configured
 
 **Import errors:**
+
 - Run tests from the `backend/` directory
 - Ensure all dependencies are installed
 
 ### Frontend
 
 **Module not found errors:**
+
 - Run `npm install` to install dependencies
 - Check that `vitest.config.ts` has correct path aliases
 
 **Tests timeout:**
+
 - Increase timeout in `vitest.config.ts`
 - Check for infinite loops or missing awaits
 
 ## Quick Commands
 
 ### Backend
+
 ```bash
 # Run all backend checks
 cd backend && flake8 app/ && black --check app/ && isort --check-only app/ && pytest -v
@@ -263,6 +268,7 @@ cd backend && black app/ && isort app/ && pytest -v
 ```
 
 ### Frontend
+
 ```bash
 # Run all frontend checks
 cd frontend && npm run lint && npm run test -- --run
@@ -272,6 +278,7 @@ cd frontend && npm run lint -- --fix && npm run test -- --run
 ```
 
 ### Both
+
 ```bash
 # Run everything from project root
 (cd backend && pytest -v) && (cd frontend && npm run test -- --run)
@@ -289,10 +296,3 @@ cd frontend && npm run lint -- --fix && npm run test -- --run
 3. Write tests following examples above
 4. Run tests locally before committing
 5. Ensure CI passes on GitHub
-
-## Resources
-
-- [pytest Documentation](https://docs.pytest.org/)
-- [Vitest Documentation](https://vitest.dev/)
-- [React Testing Library](https://testing-library.com/react)
-- [FastAPI Testing](https://fastapi.tiangolo.com/tutorial/testing/)
