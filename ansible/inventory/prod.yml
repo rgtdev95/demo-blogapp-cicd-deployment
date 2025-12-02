@@ -9,7 +9,7 @@ all:
           ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
           
           # Environment Configuration
-          environment: production
+          target_environment: production
           project_dir: /opt/blogapp-prod
           compose_file: docker-compose.prod.yml
           backup_dir: /opt/backups/blogapp
