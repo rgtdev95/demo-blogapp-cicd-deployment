@@ -51,7 +51,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
     outputs:
       backend-image: ${{ steps.image-tags.outputs.backend-image }}
       frontend-image: ${{ steps.image-tags.outputs.frontend-image }}

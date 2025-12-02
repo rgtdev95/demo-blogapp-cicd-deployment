@@ -26,6 +26,9 @@ jobs:
     name: Build & Push Production Images
     needs: ci-checks
     uses: ./.github/workflows/reusable-build.yml
+    permissions:
+      contents: read
+      packages: write
     with:
       environment: "production"
       push-images: true
