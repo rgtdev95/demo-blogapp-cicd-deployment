@@ -1,10 +1,6 @@
 ---
 # Docker Setup Role - Main Tasks
 
-- name: Include environment-specific variables
-  include_vars: "{{ ansible_os_family }}.yml"
-  failed_when: false
-
 - name: Create Docker network
   community.docker.docker_network:
     name: "{{ docker_network_name }}"

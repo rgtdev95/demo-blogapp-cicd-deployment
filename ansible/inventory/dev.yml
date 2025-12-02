@@ -9,7 +9,7 @@ all:
           ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
           
           # Environment Configuration
-          environment: development
+          target_environment: development
           project_dir: /opt/blogapp
           compose_file: docker-compose.dev.yml
           
