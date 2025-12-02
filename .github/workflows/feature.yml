@@ -53,7 +53,7 @@ jobs:
             echo "  ✅ Security Scans (Dependencies)"
             echo "  ✅ Docker Image Building"
             echo "  ✅ Image Size Validation"
-            echo "  ✅ Container Vulnerability Scanning"
+            echo "  ℹ️  Container Vulnerability Scanning (skipped for feature branches)"
             echo ""
             echo "🚀 This feature branch demonstrates:"
             echo "  • Comprehensive CI/CD pipeline"

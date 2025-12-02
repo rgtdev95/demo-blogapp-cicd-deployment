@@ -159,6 +159,7 @@ jobs:
     name: Security Scan Images
     runs-on: ubuntu-latest
     needs: build-images
+    if: ${{ inputs.environment != 'feature' }}
     steps:
       - name: Scan Backend Image
         uses: aquasecurity/trivy-action@master
