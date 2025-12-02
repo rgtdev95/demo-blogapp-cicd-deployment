@@ -1,0 +1,70 @@
+---
+# Docker Setup Role - Main Tasks
+
+- name: Include environment-specific variables
+  include_vars: "{{ ansible_os_family }}.yml"
+  failed_when: false
+
+- name: Create Docker network
+  community.docker.docker_network:
+    name: "{{ docker_network_name }}"
+    state: present
+  register: network_result
+  ignore_errors: true
+  tags: docker
+
+- name: Display network creation result
+  debug:
+    msg: "Docker network '{{ docker_network_name }}' {{ 'created' if network_result.changed else 'already exists' }}"
+  tags: docker
+
+- name: Log in to GitHub Container Registry
+  community.docker.docker_login:
+    registry: "{{ docker_registry }}"
+    username: "{{ github_actor }}"
+    password: "{{ github_token }}"
+  tags: docker
+
+- name: Verify Docker login
+  debug:
+    msg: "Successfully logged in to {{ docker_registry }}"
+  tags: docker
+
+- name: Pull latest images
+  command: docker compose pull
+  args:
+    chdir: "{{ project_dir }}"
+  register: pull_result
+  tags: docker
+
+- name: Display pulled images
+  debug:
+    var: pull_result.stdout_lines
+  when: pull_result.stdout_lines is defined
+  tags: docker
+
+- name: Stop existing containers gracefully
+  command: "docker compose down --timeout {{ container_stop_timeout }}"
+  args:
+    chdir: "{{ project_dir }}"
+  ignore_errors: true
+  tags: docker
+
+- name: Remove orphaned containers
+  command: docker compose down --remove-orphans
+  args:
+    chdir: "{{ project_dir }}"
+  ignore_errors: true
+  tags: docker
+
+- name: Clean up unused Docker images
+  command: docker image prune -f
+  when: image_cleanup_enabled | bool
+  ignore_errors: true
+  tags: cleanup
+
+- name: Clean up unused Docker volumes
+  command: docker volume prune -f
+  when: volume_cleanup_enabled | bool
+  ignore_errors: true
+  tags: cleanup

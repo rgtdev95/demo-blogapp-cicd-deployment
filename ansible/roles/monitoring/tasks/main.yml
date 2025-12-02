@@ -1,0 +1,143 @@
+---
+# Monitoring Role - Production Monitoring Stack
+
+- name: Skip monitoring tasks for non-production environments
+  debug:
+    msg: "Skipping monitoring setup - not enabled for this environment"
+  when: not monitoring_enabled | bool
+
+- name: Execute monitoring setup tasks
+  block:
+    - name: Create monitoring configuration directory
+      file:
+        path: "{{ project_dir }}/monitoring"
+        state: directory
+        mode: "{{ directory_permission }}"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+      tags: monitoring
+
+    - name: Create Prometheus configuration
+      template:
+        src: prometheus.yml.j2
+        dest: "{{ project_dir }}/monitoring/prometheus.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "{{ config_permission }}"
+      tags: monitoring
+
+    - name: Create Grafana provisioning directories
+      file:
+        path: "{{ project_dir }}/monitoring/grafana/{{ item }}"
+        state: directory
+        mode: "{{ directory_permission }}"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+      loop:
+        - dashboards
+        - datasources
+      tags: monitoring
+
+    - name: Create Grafana datasource configuration
+      template:
+        src: grafana-datasource.yml.j2
+        dest: "{{ project_dir }}/monitoring/grafana/datasources/prometheus.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "{{ config_permission }}"
+      tags: monitoring
+
+    - name: Create Grafana dashboard configuration
+      template:
+        src: grafana-dashboard.yml.j2
+        dest: "{{ project_dir }}/monitoring/grafana/dashboards/dashboard.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "{{ config_permission }}"
+      tags: monitoring
+
+    - name: Check if monitoring containers are running
+      shell: |
+        docker ps --format "table {% raw %}{{.Names}}\t{{.Status}}{% endraw %}" | grep -E "(prometheus|grafana|cadvisor)"
+      register: monitoring_status
+      ignore_errors: true
+      changed_when: false
+      tags: monitoring
+
+    - name: Display monitoring services status
+      debug:
+        msg: "{{ monitoring_status.stdout_lines }}"
+      when: monitoring_status.stdout_lines is defined and monitoring_status.stdout_lines | length > 0
+      tags: monitoring
+
+    - name: Wait for Prometheus to be healthy
+      uri:
+        url: "http://localhost:{{ prometheus_port }}/-/healthy"
+        method: GET
+        timeout: "{{ health_check_timeout }}"
+      register: prometheus_health
+      retries: "{{ health_check_retries }}"
+      delay: "{{ health_check_delay }}"
+      until: prometheus_health.status == 200
+      ignore_errors: true
+      tags: monitoring
+
+    - name: Wait for Grafana to be healthy
+      uri:
+        url: "http://localhost:{{ grafana_port }}/api/health"
+        method: GET
+        timeout: "{{ health_check_timeout }}"
+      register: grafana_health
+      retries: "{{ health_check_retries }}"
+      delay: "{{ health_check_delay }}"
+      until: grafana_health.status == 200
+      ignore_errors: true
+      tags: monitoring
+
+    - name: Verify monitoring endpoints
+      uri:
+        url: "{{ item.url }}"
+        method: GET
+        timeout: "{{ health_check_timeout }}"
+        status_code: "{{ item.expected_status }}"
+      loop:
+        - { url: "http://localhost:{{ prometheus_port }}", expected_status: 200 }
+        - { url: "http://localhost:{{ grafana_port }}", expected_status: 200 }
+        - { url: "http://localhost:{{ cadvisor_port }}", expected_status: 200 }
+      register: monitoring_checks
+      ignore_errors: true
+      tags: monitoring
+
+    - name: Display monitoring endpoint results
+      debug:
+        msg: "{{ item.item.url }}: {{ 'OK' if item.status == item.item.expected_status else 'FAILED' }}"
+      loop: "{{ monitoring_checks.results }}"
+      when: monitoring_checks is defined
+      tags: monitoring
+
+    - name: Create monitoring summary
+      template:
+        src: monitoring-info.j2
+        dest: "{{ project_dir }}/monitoring-info.json"
+        mode: "{{ config_permission }}"
+      tags: monitoring
+
+    - name: Display monitoring setup summary
+      debug:
+        msg:
+          - "📊 Monitoring Stack Summary"
+          - "Prometheus: http://{{ ansible_host }}:{{ prometheus_port }}"
+          - "Grafana: http://{{ ansible_host }}:{{ grafana_port }}"
+          - "  Admin User: {{ grafana_admin_user }}"
+          - "  Default Password: Check deployment secrets"
+          - "cAdvisor: http://{{ ansible_host }}:{{ cadvisor_port }}"
+          - "Retention: {{ prometheus_retention }}"
+          - "Scrape Interval: {{ prometheus_scrape_interval }}"
+          - ""
+          - "📋 Next Steps:"
+          - "1. Access Grafana dashboard for metrics visualization"
+          - "2. Configure alerting rules in Prometheus (optional)"
+          - "3. Set up external monitoring endpoints"
+      tags: monitoring
+
+  when: monitoring_enabled | bool

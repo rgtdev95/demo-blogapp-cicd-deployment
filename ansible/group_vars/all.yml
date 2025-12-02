@@ -1,0 +1,56 @@
+---
+# Shared variables across all environments
+
+# Docker Configuration
+docker_network_name: blogapp_network
+docker_registry: ghcr.io
+github_repository_owner: "{{ github_repository_owner }}"
+
+# Database Configuration
+mysql_port: 3306
+database_container_name_prefix: blogapp_mysql
+
+# Application Configuration
+algorithm: HS256
+api_prefix: /api
+static_files_enabled: true
+
+# Directory Structure
+required_directories:
+  - conf.d
+  - logs
+  - ssl
+  - uploads
+  - nginx
+
+# File Permissions
+uploads_permission: "0777"
+config_permission: "0644"
+secret_permission: "0600"
+directory_permission: "0755"
+
+# Health Check Configuration
+health_check_retries: 12
+health_check_delay: 10
+health_check_timeout: 10
+
+# Container Management
+container_stop_timeout: 30
+image_cleanup_enabled: true
+volume_cleanup_enabled: true
+
+# Deployment Info
+deployment_info_enabled: true
+deployment_info_file: deployment-info.json
+
+# Security Headers (for production use)
+security_headers:
+  - "X-Content-Type-Options: nosniff"
+  - "X-Frame-Options: DENY"
+  - "X-XSS-Protection: 1; mode=block"
+  - "Strict-Transport-Security: max-age=31536000; includeSubDomains"
+
+# Nginx Configuration
+nginx_worker_processes: auto
+nginx_worker_connections: 1024
+nginx_client_max_body_size: 50M

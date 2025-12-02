@@ -1,0 +1,46 @@
+all:
+  children:
+    prod:
+      hosts:
+        prod-server:
+          ansible_host: "{{ PROD_SERVER_IP }}"
+          ansible_user: "{{ PROD_SERVER_USER }}"
+          ansible_ssh_private_key_file: ~/.ssh/id_rsa_prod
+          ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+          
+          # Environment Configuration
+          environment: production
+          project_dir: /opt/blogapp-prod
+          compose_file: docker-compose.prod.yml
+          backup_dir: /opt/backups/blogapp
+          
+          # Service Ports
+          backend_port: "{{ PROD_BACKEND_PORT | default('8000') }}"
+          phpmyadmin_port: "{{ PROD_PHPMYADMIN_PORT | default('8080') }}"
+          
+          # Features
+          debug_mode: false
+          backup_enabled: true
+          monitoring_enabled: true
+          ssl_enabled: true
+          
+          # Production Configuration
+          domain_name: "{{ PROD_DOMAIN_NAME | default('blog.yourdomain.com') }}"
+          api_url: "{{ PROD_API_URL | default('https://blog.yourdomain.com') }}"
+          cors_origins:
+            - "https://{{ PROD_DOMAIN_NAME | default('blog.yourdomain.com') }}"
+            - "http://{{ PROD_SERVER_IP }}"
+          
+          # Monitoring Ports
+          prometheus_port: 9090
+          grafana_port: 3001
+          cadvisor_port: 8082
+          
+          # Cache Configuration
+          redis_port: 6379
+          redis_enabled: true
+          
+          # Security
+          log_level: info
+          access_token_expire_minutes: 30
+          backup_retention_days: 30
