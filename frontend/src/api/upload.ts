@@ -15,11 +15,10 @@ export const uploadFile = async (file: File): Promise<UploadResponse> => {
         },
     });
 
-    // Prepend API URL if the response is a relative path
+    // Prepend API URL if the response is a relative path and VITE_API_URL is set
     const url = response.data.url;
-    if (url.startsWith('/')) {
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-        response.data.url = `${apiUrl}${url}`;
+    if (url.startsWith('/') && import.meta.env.VITE_API_URL) {
+        response.data.url = `${import.meta.env.VITE_API_URL}${url}`;
     }
 
     return response.data;

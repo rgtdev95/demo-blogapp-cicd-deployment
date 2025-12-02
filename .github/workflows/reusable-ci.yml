@@ -1,0 +1,249 @@
+name: Reusable CI Pipeline
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+        description: "Environment name (feature, development, production)"
+      node-version:
+        required: false
+        type: string
+        default: "20"
+        description: "Node.js version to use"
+      python-version:
+        required: false
+        type: string
+        default: "3.11"
+        description: "Python version to use"
+    outputs:
+      ci-status:
+        description: "Overall CI status"
+        value: ${{ jobs.ci-summary.outputs.status }}
+
+jobs:
+  # Frontend Linting Job
+  frontend-lint:
+    name: Frontend Linting
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: "npm"
+          cache-dependency-path: "./frontend/package-lock.json"
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run ESLint
+        run: npm run lint
+      
+      - name: TypeScript type check
+        run: npx tsc --noEmit
+
+  # Backend Linting Job
+  backend-lint:
+    name: Backend Linting
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+          cache: "pip"
+          cache-dependency-path: "./backend/requirements.txt"
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install flake8 black isort mypy
+      
+      - name: Run Flake8 (Linting)
+        run: flake8 app/ --count --select=E9,F63,F7,F82 --show-source --statistics
+      
+      - name: Run Flake8 (Full check with warnings)
+        run: flake8 app/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      
+      - name: Check code formatting with Black
+        run: black --check app/
+      
+      - name: Check import sorting with isort
+        run: isort --check-only app/
+      
+      - name: Run MyPy (Type checking)
+        run: mypy app/ --ignore-missing-imports || true
+
+  # Frontend Testing Job
+  frontend-test:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: "npm"
+          cache-dependency-path: "./frontend/package-lock.json"
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run tests
+        run: npm run test -- --run
+      
+      - name: Generate coverage report
+        if: always()
+        run: npm run test:coverage -- --run
+      
+      - name: Upload coverage reports (dev/prod only)
+        if: ${{ inputs.environment != 'feature' }}
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./frontend/coverage.xml
+        continue-on-error: true
+
+  # Backend Testing Job
+  backend-test:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+          cache: "pip"
+          cache-dependency-path: "./backend/requirements*.txt"
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Run tests with coverage
+        env:
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+          SECRET_KEY: "test_secret_key_for_ci_pipeline"
+        run: pytest -v --cov=app --cov-report=term-missing --cov-report=xml
+      
+      - name: Upload coverage reports (dev/prod only)
+        if: ${{ inputs.environment != 'feature' }}
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./backend/coverage.xml
+        continue-on-error: true
+
+  # Security Scanning Jobs
+  backend-security:
+    name: Backend Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+          cache: "pip"
+      
+      - name: Install dependencies
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install safety
+      
+      - name: Run security check
+        run: |
+          cd backend
+          safety check ${{ inputs.environment == 'production' && '--full-report' || '' }}
+
+  frontend-security:
+    name: Frontend Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+      
+      - name: Run security audit
+        run: |
+          cd frontend
+          npm audit --audit-level=${{ inputs.environment == 'production' && 'moderate' || 'high' }}
+
+  # CI Summary Job
+  ci-summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs:
+      - frontend-lint
+      - backend-lint
+      - frontend-test
+      - backend-test
+      - backend-security
+      - frontend-security
+    if: always()
+    outputs:
+      status: ${{ steps.set-status.outputs.status }}
+    steps:
+      - name: Check job results
+        id: set-status
+        run: |
+          echo "Frontend Lint: ${{ needs.frontend-lint.result }}"
+          echo "Backend Lint: ${{ needs.backend-lint.result }}"
+          echo "Frontend Test: ${{ needs.frontend-test.result }}"
+          echo "Backend Test: ${{ needs.backend-test.result }}"
+          echo "Backend Security: ${{ needs.backend-security.result }}"
+          echo "Frontend Security: ${{ needs.frontend-security.result }}"
+          
+          if [ "${{ needs.frontend-lint.result }}" != "success" ] || \
+             [ "${{ needs.backend-lint.result }}" != "success" ] || \
+             [ "${{ needs.frontend-test.result }}" != "success" ] || \
+             [ "${{ needs.backend-test.result }}" != "success" ] || \
+             [ "${{ needs.backend-security.result }}" != "success" ] || \
+             [ "${{ needs.frontend-security.result }}" != "success" ]; then
+            echo "❌ One or more CI checks failed"
+            echo "status=failed" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "✅ All CI checks passed for ${{ inputs.environment }} environment"
+            echo "status=success" >> $GITHUB_OUTPUT
+          fi

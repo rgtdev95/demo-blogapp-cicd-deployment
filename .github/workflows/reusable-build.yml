@@ -1,0 +1,211 @@
+name: Reusable Build Pipeline
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+        description: "Environment name (feature, development, production)"
+      push-images:
+        required: false
+        type: boolean
+        default: true
+        description: "Whether to push images to registry"
+      image-tag:
+        required: false
+        type: string
+        default: ""
+        description: "Custom image tag (optional)"
+      backend-size-limit-mb:
+        required: false
+        type: number
+        default: 500
+        description: "Backend image size limit in MB"
+      frontend-size-limit-mb:
+        required: false
+        type: number
+        default: 150
+        description: "Frontend image size limit in MB"
+      build-args-backend:
+        required: false
+        type: string
+        default: ""
+        description: "Additional build args for backend"
+      build-args-frontend:
+        required: false
+        type: string
+        default: ""
+        description: "Additional build args for frontend"
+    outputs:
+      backend-image:
+        description: "Backend image name and tag"
+        value: ${{ jobs.build-images.outputs.backend-image }}
+      frontend-image:
+        description: "Frontend image name and tag"
+        value: ${{ jobs.build-images.outputs.frontend-image }}
+
+jobs:
+  build-images:
+    name: Build & Validate Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      backend-image: ${{ steps.image-tags.outputs.backend-image }}
+      frontend-image: ${{ steps.image-tags.outputs.frontend-image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Determine image tags
+        id: image-tags
+        run: |
+          if [ "${{ inputs.environment }}" = "production" ]; then
+            BACKEND_TAG="ghcr.io/${{ github.repository_owner }}/blogapp-backend:${{ inputs.image-tag || github.ref_name }}"
+            FRONTEND_TAG="ghcr.io/${{ github.repository_owner }}/blogapp-frontend:${{ inputs.image-tag || github.ref_name }}"
+          elif [ "${{ inputs.environment }}" = "development" ]; then
+            BACKEND_TAG="ghcr.io/${{ github.repository_owner }}/blogapp-backend:dev"
+            FRONTEND_TAG="ghcr.io/${{ github.repository_owner }}/blogapp-frontend:dev"
+          else
+            # Feature branches - local tags only
+            BACKEND_TAG="blogapp-backend:test"
+            FRONTEND_TAG="blogapp-frontend:test"
+          fi
+          
+          echo "backend-image=${BACKEND_TAG}" >> $GITHUB_OUTPUT
+          echo "frontend-image=${FRONTEND_TAG}" >> $GITHUB_OUTPUT
+          echo "Backend image: ${BACKEND_TAG}"
+          echo "Frontend image: ${FRONTEND_TAG}"
+
+      - name: Login to GitHub Container Registry
+        if: ${{ inputs.push-images }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Build Backend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: ${{ inputs.push-images }}
+          load: true
+          tags: ${{ steps.image-tags.outputs.backend-image }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: ${{ inputs.build-args-backend }}
+
+      - name: Build Frontend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/.Dockerfile
+          push: ${{ inputs.push-images }}
+          load: true
+          tags: ${{ steps.image-tags.outputs.frontend-image }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: ${{ inputs.build-args-frontend }}
+
+      - name: Check Image Sizes
+        run: |
+          echo "📊 Checking image sizes..."
+          
+          # Backend Image Size Check
+          BACKEND_BYTES=$(docker image inspect ${{ steps.image-tags.outputs.backend-image }} --format='{{.Size}}')
+          BACKEND_MB=$(echo "scale=2; $BACKEND_BYTES/1024/1024" | bc)
+          echo "Backend Image Size: ${BACKEND_BYTES} bytes (${BACKEND_MB} MB)"
+          
+          # Frontend Image Size Check
+          FRONTEND_BYTES=$(docker image inspect ${{ steps.image-tags.outputs.frontend-image }} --format='{{.Size}}')
+          FRONTEND_MB=$(echo "scale=2; $FRONTEND_BYTES/1024/1024" | bc)
+          echo "Frontend Image Size: ${FRONTEND_BYTES} bytes (${FRONTEND_MB} MB)"
+          
+          # Size validation
+          BACKEND_LIMIT_MB=${{ inputs.backend-size-limit-mb }}
+          FRONTEND_LIMIT_MB=${{ inputs.frontend-size-limit-mb }}
+          
+          BACKEND_LIMIT_BYTES=$((BACKEND_LIMIT_MB * 1024 * 1024))
+          FRONTEND_LIMIT_BYTES=$((FRONTEND_LIMIT_MB * 1024 * 1024))
+          
+          echo "📋 Size Limits:"
+          echo "  Backend: ${BACKEND_LIMIT_MB} MB (${BACKEND_LIMIT_BYTES} bytes)"
+          echo "  Frontend: ${FRONTEND_LIMIT_MB} MB (${FRONTEND_LIMIT_BYTES} bytes)"
+          
+          # Validate backend size
+          if [ "$BACKEND_BYTES" -gt "$BACKEND_LIMIT_BYTES" ]; then
+            echo "❌ Backend image (${BACKEND_MB} MB) exceeds ${BACKEND_LIMIT_MB} MB limit"
+            exit 1
+          else
+            echo "✅ Backend image size within limits"
+          fi
+          
+          # Validate frontend size  
+          if [ "$FRONTEND_BYTES" -gt "$FRONTEND_LIMIT_BYTES" ]; then
+            echo "❌ Frontend image (${FRONTEND_MB} MB) exceeds ${FRONTEND_LIMIT_MB} MB limit"
+            exit 1
+          else
+            echo "✅ Frontend image size within limits"
+          fi
+          
+          echo "🎉 All image size checks passed!"
+
+  security-scan:
+    name: Security Scan Images
+    runs-on: ubuntu-latest
+    needs: build-images
+    if: ${{ inputs.environment != 'feature' }}
+    steps:
+      - name: Scan Backend Image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ needs.build-images.outputs.backend-image }}
+          format: ${{ inputs.environment == 'production' && 'sarif' || 'table' }}
+          output: ${{ inputs.environment == 'production' && 'backend-trivy-results.sarif' || '' }}
+          exit-code: "1"
+          ignore-unfixed: true
+          vuln-type: "os,library"
+          severity: ${{ inputs.environment == 'production' && 'CRITICAL,HIGH,MEDIUM' || 'CRITICAL,HIGH' }}
+
+      - name: Upload Backend Scan Results (Production only)
+        if: ${{ inputs.environment == 'production' }}
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: "backend-trivy-results.sarif"
+        continue-on-error: true
+
+      - name: Scan Frontend Image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ needs.build-images.outputs.frontend-image }}
+          format: ${{ inputs.environment == 'production' && 'sarif' || 'table' }}
+          output: ${{ inputs.environment == 'production' && 'frontend-trivy-results.sarif' || '' }}
+          exit-code: "1"
+          ignore-unfixed: true
+          vuln-type: "library"
+          severity: ${{ inputs.environment == 'production' && 'CRITICAL,HIGH,MEDIUM' || 'CRITICAL,HIGH' }}
+
+      - name: Upload Frontend Scan Results (Production only)
+        if: ${{ inputs.environment == 'production' }}
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: "frontend-trivy-results.sarif"
+        continue-on-error: true
+
+      - name: Security Scan Summary
+        if: always()
+        run: |
+          echo "🔒 Security scan completed for ${{ inputs.environment }} environment"
+          echo "Backend image: ${{ needs.build-images.outputs.backend-image }}"
+          echo "Frontend image: ${{ needs.build-images.outputs.frontend-image }}"
+          
+          if [ "${{ inputs.environment }}" = "production" ]; then
+            echo "📊 SARIF reports uploaded to GitHub Security tab"
+          else
+            echo "📊 Security scan results displayed in workflow logs"
+          fi
