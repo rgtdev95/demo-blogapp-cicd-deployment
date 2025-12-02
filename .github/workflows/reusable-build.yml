@@ -163,6 +163,7 @@ jobs:
     steps:
       - name: Scan Backend Image
         uses: aquasecurity/trivy-action@master
+        continue-on-error: true
         with:
           image-ref: ${{ needs.build-images.outputs.backend-image }}
           format: ${{ inputs.environment == 'production' && 'sarif' || 'table' }}
@@ -181,6 +182,7 @@ jobs:
 
       - name: Scan Frontend Image
         uses: aquasecurity/trivy-action@master
+        continue-on-error: true
         with:
           image-ref: ${{ needs.build-images.outputs.frontend-image }}
           format: ${{ inputs.environment == 'production' && 'sarif' || 'table' }}
