@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.user import UserResponse
 
@@ -19,8 +19,7 @@ class CommentAuthor(BaseModel):
     name: str
     avatar: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CommentResponse(CommentBase):
@@ -30,5 +29,4 @@ class CommentResponse(CommentBase):
     author: CommentAuthor
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
