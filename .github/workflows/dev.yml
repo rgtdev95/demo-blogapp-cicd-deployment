@@ -66,7 +66,8 @@ jobs:
         env:
           ANSIBLE_HOST_KEY_CHECKING: "False"
         run: |
-          ansible-playbook -i ansible/inventory/dev.yml ansible/playbook/deploy-dev-new.yml \
+          cd ansible
+          ansible-playbook -i inventory/dev.yml playbook/deploy-dev-new.yml \
             -e "DEV_SERVER_IP=${{ secrets.DEV_SERVER_IP }}" \
             -e "DEV_SERVER_USER=${{ secrets.DEV_SERVER_USER }}" \
             -e "mysql_root_password=${{ secrets.MYSQL_ROOT_PASSWORD }}" \

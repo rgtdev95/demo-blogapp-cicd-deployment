@@ -114,7 +114,8 @@ jobs:
         env:
           ANSIBLE_HOST_KEY_CHECKING: "False"
         run: |
-          ansible-playbook -i ansible/inventory/prod.yml ansible/playbook/deploy-prod-new.yml \
+          cd ansible
+          ansible-playbook -i inventory/prod.yml playbook/deploy-prod-new.yml \
             -e "target_environment=production" \
             -e "app_version=${{ github.ref_name }}" \
             -e "PROD_SERVER_IP=${{ secrets.PROD_SERVER_IP }}" \
