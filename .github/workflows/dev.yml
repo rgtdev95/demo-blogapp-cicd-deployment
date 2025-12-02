@@ -1,0 +1,82 @@
+name: Dev Environment CI/CD
+
+on:
+  push:
+    branches:
+      - dev
+  pull_request:
+    branches:
+      - dev
+
+jobs:
+  # Run comprehensive CI checks using reusable workflow
+  ci-checks:
+    name: CI Pipeline
+    uses: ./.github/workflows/reusable-ci.yml
+    with:
+      environment: "development"
+      node-version: "20"
+      python-version: "3.11"
+    secrets: inherit
+
+  # Build and push images (only on push to dev branch)
+  build-and-push:
+    name: Build & Push
+    needs: ci-checks
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    uses: ./.github/workflows/reusable-build.yml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      environment: "development"
+      push-images: true
+      backend-size-limit-mb: 500
+      frontend-size-limit-mb: 150
+      build-args-frontend: |
+        VITE_API_URL=https://dev-blogapp.internal.rtg-homelabs.tech
+        VITE_APP_ENV=production
+    secrets: inherit
+
+  # Deploy to Dev Environment (only on push to dev branch)
+  deploy:
+    name: Deploy to Dev
+    needs: build-and-push
+    runs-on: self-hosted # ← CRITICAL: must be your on-premise runner
+    timeout-minutes: 15
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install Ansible
+        run: pip install ansible
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh/
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.DEV_SERVER_IP }} >> ~/.ssh/known_hosts
+
+      - name: Run Ansible Playbook
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: "False"
+        run: |
+          ansible-playbook -i ansible/inventory/dev.yml ansible/playbook/deploy-dev-new.yml \
+            -e "DEV_SERVER_IP=${{ secrets.DEV_SERVER_IP }}" \
+            -e "DEV_SERVER_USER=${{ secrets.DEV_SERVER_USER }}" \
+            -e "mysql_root_password=${{ secrets.MYSQL_ROOT_PASSWORD }}" \
+            -e "mysql_database=${{ secrets.MYSQL_DATABASE }}" \
+            -e "mysql_user=${{ secrets.MYSQL_USER }}" \
+            -e "mysql_password=${{ secrets.MYSQL_PASSWORD }}" \
+            -e "secret_key=${{ secrets.SECRET_KEY }}" \
+            -e "backend_port=${{ vars.BACKEND_PORT || '8000' }}" \
+            -e "phpmyadmin_port=${{ vars.PHPMYADMIN_PORT || '8080' }}" \
+            -e "github_repository_owner=${{ github.repository_owner }}" \
+            -e "github_actor=${{ github.actor }}" \
+            -e "github_token=${{ secrets.GITHUB_TOKEN }}" \
+            -e "app_version=latest"

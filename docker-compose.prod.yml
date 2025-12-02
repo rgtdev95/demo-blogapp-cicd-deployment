@@ -1,0 +1,235 @@
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: blogapp-nginx-prod
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./conf.d:/etc/nginx/conf.d:ro 
+      - ./logs:/var/log/nginx
+      - ./ssl:/etc/nginx/ssl:ro
+    restart: unless-stopped
+    networks:
+      - blogapp_network
+    depends_on:
+      mysql:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health", "||", "exit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  mysql:
+    image: mysql:8.0
+    container_name: blogapp_mysql_prod
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data_prod:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - blogapp_network
+    command: --innodb-buffer-pool-size=256M --max-connections=200
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: blogapp_phpmyadmin_prod
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: ${MYSQL_USER}
+      PMA_PASSWORD: ${MYSQL_PASSWORD}
+      UPLOAD_LIMIT: 50M
+      MEMORY_LIMIT: 512M
+      MAX_EXECUTION_TIME: 600
+    ports:
+      - "${PHPMYADMIN_PORT:-8080}:80"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - blogapp_network
+
+  backend:
+    # Production images with version tags
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER}/blogapp-backend:latest
+    container_name: blogapp-backend-prod
+    env_file:
+      - .env
+    entrypoint: ["./entrypoint.sh"]
+    command: ["gunicorn", "app.main:app", "-c", "gunicorn.conf.py"]
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      - DATABASE_URL=mysql+aiomysql://${MYSQL_USER}:${MYSQL_PASSWORD}@blogapp_mysql_prod:3306/${MYSQL_DATABASE}
+      - DEBUG=False
+      - LOG_LEVEL=info
+    volumes:
+      - ./uploads:/home/app/uploads
+      - ./logs:/home/app/logs
+    networks:
+      - blogapp_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      mysql:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  frontend:
+    # Production images with version tags
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER}/blogapp-frontend:latest
+    container_name: blogapp-frontend-prod
+    ports:
+      - "8081:80"
+    environment:
+      - NODE_ENV=production
+    networks:
+      - blogapp_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/", "||", "exit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
+  # Optional: Prometheus monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: blogapp-prometheus-prod
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - blogapp_network
+    profiles:
+      - monitoring
+    depends_on:
+      - backend
+      - frontend
+
+  # Optional: Grafana dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: blogapp-grafana-prod
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin123}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_DOMAIN=${DOMAIN_NAME:-localhost}
+      - GF_SERVER_ROOT_URL=http://${DOMAIN_NAME:-localhost}:3001/
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+    restart: unless-stopped
+    networks:
+      - blogapp_network
+    profiles:
+      - monitoring
+    depends_on:
+      - prometheus
+
+  # Optional: cAdvisor for container monitoring
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: blogapp-cadvisor-prod
+    ports:
+      - "${CADVISOR_PORT:-8082}:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    privileged: true
+    devices:
+      - /dev/kmsg
+    restart: unless-stopped
+    networks:
+      - blogapp_network
+    profiles:
+      - monitoring
+
+  # Optional: Redis for caching and sessions
+  redis:
+    image: redis:7-alpine
+    container_name: blogapp-redis-prod
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis123}
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - blogapp_network
+    profiles:
+      - caching
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  mysql_data_prod:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  blogapp_network:
+    external: true

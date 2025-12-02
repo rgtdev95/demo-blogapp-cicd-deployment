@@ -1,0 +1,31 @@
+all:
+  children:
+    dev:
+      hosts:
+        dev-server:
+          ansible_host: "{{ DEV_SERVER_IP }}"
+          ansible_user: "{{ DEV_SERVER_USER }}"
+          ansible_ssh_private_key_file: ~/.ssh/id_rsa
+          ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+          
+          # Environment Configuration
+          environment: development
+          project_dir: /opt/blogapp
+          compose_file: docker-compose.dev.yml
+          
+          # Service Ports
+          backend_port: "{{ BACKEND_PORT | default('8000') }}"
+          phpmyadmin_port: "{{ PHPMYADMIN_PORT | default('8080') }}"
+          
+          # Features
+          debug_mode: true
+          backup_enabled: false
+          monitoring_enabled: false
+          ssl_enabled: false
+          
+          # API Configuration
+          api_url: "https://dev-blogapp.internal.rtg-homelabs.tech"
+          cors_origins: 
+            - "http://{{ DEV_SERVER_IP }}"
+            - "http://{{ DEV_SERVER_IP }}:8081"
+            - "https://dev-blogapp.internal.rtg-homelabs.tech"

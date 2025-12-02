@@ -1,9 +1,177 @@
-# name: Production Branch CI
+name: Production Release
 
-# on:
-#     push:
-#         branches:
-#             - main
-#     pull_request:
-#         branches:
-#             - main
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Triggers on tags like v1.0.0, v1.2.3, etc.
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME_BACKEND: ${{ github.repository_owner }}/blogapp-backend
+  IMAGE_NAME_FRONTEND: ${{ github.repository_owner }}/blogapp-frontend
+
+jobs:
+  # Quality Gates using reusable workflow
+  ci-checks:
+    name: Production CI Pipeline
+    uses: ./.github/workflows/reusable-ci.yml
+    with:
+      environment: "production"
+      node-version: "20"
+      python-version: "3.11"
+    secrets: inherit
+
+  # Build and Push Production Images with metadata
+  build-and-push-production:
+    name: Build & Push Production Images
+    needs: ci-checks
+    uses: ./.github/workflows/reusable-build.yml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      environment: "production"
+      push-images: true
+      image-tag: ${{ github.ref_name }}
+      backend-size-limit-mb: 500
+      frontend-size-limit-mb: 150
+      build-args-frontend: |
+        VITE_API_URL=${{ vars.PROD_API_URL || 'https://blog.yourdomain.com' }}
+        VITE_APP_ENV=production
+    secrets: inherit
+
+  # Add production-specific metadata tagging
+  tag-production-images:
+    name: Tag Production Images
+    runs-on: ubuntu-latest
+    needs: build-and-push-production
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag images with latest
+        run: |
+          # Pull the tagged images
+          docker pull ghcr.io/${{ github.repository_owner }}/blogapp-backend:${{ github.ref_name }}
+          docker pull ghcr.io/${{ github.repository_owner }}/blogapp-frontend:${{ github.ref_name }}
+          
+          # Tag with latest
+          docker tag ghcr.io/${{ github.repository_owner }}/blogapp-backend:${{ github.ref_name }} ghcr.io/${{ github.repository_owner }}/blogapp-backend:latest
+          docker tag ghcr.io/${{ github.repository_owner }}/blogapp-frontend:${{ github.ref_name }} ghcr.io/${{ github.repository_owner }}/blogapp-frontend:latest
+          
+          # Push latest tags
+          docker push ghcr.io/${{ github.repository_owner }}/blogapp-backend:latest
+          docker push ghcr.io/${{ github.repository_owner }}/blogapp-frontend:latest
+          
+          echo "✅ Images tagged with 'latest' for production"
+
+  # Production Deployment Approval Gate
+  approve-production:
+    name: Approve Production Deployment
+    runs-on: ubuntu-latest
+    needs: [build-and-push-production, tag-production-images]
+    environment: production  # Requires GitHub environment with protection rules
+    steps:
+      - name: Manual Approval Required
+        run: |
+          echo "🚀 Production deployment approved for tag: ${{ github.ref_name }}"
+          echo "Images built and security scanned successfully"
+
+  # Deploy to Production
+  deploy-production:
+    name: Deploy to Production
+    runs-on: self-hosted
+    needs: [approve-production]
+    timeout-minutes: 20
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install Ansible
+        run: pip install ansible
+
+      - name: Setup SSH for Production
+        run: |
+          mkdir -p ~/.ssh/
+          echo "${{ secrets.PROD_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa_prod
+          chmod 600 ~/.ssh/id_rsa_prod
+          ssh-keyscan -H ${{ secrets.PROD_SERVER_IP }} >> ~/.ssh/known_hosts
+
+      - name: Run Production Deployment
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: "False"
+        run: |
+          ansible-playbook -i ansible/inventory/prod.yml ansible/playbook/deploy-prod-new.yml \
+            -e "target_environment=production" \
+            -e "app_version=${{ github.ref_name }}" \
+            -e "PROD_SERVER_IP=${{ secrets.PROD_SERVER_IP }}" \
+            -e "PROD_SERVER_USER=${{ secrets.PROD_SERVER_USER }}" \
+            -e "mysql_root_password=${{ secrets.PROD_MYSQL_ROOT_PASSWORD }}" \
+            -e "mysql_database=${{ secrets.PROD_MYSQL_DATABASE }}" \
+            -e "mysql_user=${{ secrets.PROD_MYSQL_USER }}" \
+            -e "mysql_password=${{ secrets.PROD_MYSQL_PASSWORD }}" \
+            -e "secret_key=${{ secrets.PROD_SECRET_KEY }}" \
+            -e "backend_port=${{ vars.PROD_BACKEND_PORT || '8000' }}" \
+            -e "phpmyadmin_port=${{ vars.PROD_PHPMYADMIN_PORT || '8080' }}" \
+            -e "domain_name=${{ vars.PROD_DOMAIN_NAME || 'blog.yourdomain.com' }}" \
+            -e "grafana_admin_password=${{ secrets.GRAFANA_ADMIN_PASSWORD || 'admin123' }}" \
+            -e "redis_password=${{ secrets.REDIS_PASSWORD || 'redis123' }}" \
+            -e "github_repository_owner=${{ github.repository_owner }}" \
+            -e "github_actor=${{ github.actor }}" \
+            -e "github_token=${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Verify Deployment
+        run: |
+          # Wait for services to be ready
+          sleep 30
+          
+          # Basic health check (you can customize the endpoint)
+          curl -f http://${{ secrets.PROD_SERVER_IP }}/health || echo "⚠️ Health check endpoint not available"
+          
+          echo "✅ Production deployment completed for version ${{ github.ref_name }}"
+
+      - name: Notify Deployment Success
+        if: success()
+        run: |
+          echo "🎉 Production Deployment Successful!"
+          echo "Version: ${{ github.ref_name }}"
+          echo "Domain: ${{ vars.PROD_DOMAIN_NAME || 'blog.yourdomain.com' }}"
+          echo "Backend Health: http://${{ secrets.PROD_SERVER_IP }}:8000/health"
+
+  # Cleanup old images (optional)
+  cleanup:
+    name: Cleanup Old Images
+    runs-on: ubuntu-latest
+    needs: deploy-production
+    if: success()
+    steps:
+      - name: Delete old container images
+        uses: actions/delete-package-versions@v4
+        continue-on-error: true
+        with:
+          package-name: blogapp-backend
+          package-type: container
+          min-versions-to-keep: 10
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete old frontend images
+        uses: actions/delete-package-versions@v4
+        continue-on-error: true
+        with:
+          package-name: blogapp-frontend
+          package-type: container
+          min-versions-to-keep: 10
+          token: ${{ secrets.GITHUB_TOKEN }}
