@@ -94,6 +94,7 @@ jobs:
           context: ./backend
           file: ./backend/Dockerfile
           push: ${{ inputs.push-images }}
+          load: ${{ !inputs.push-images }}
           tags: ${{ steps.image-tags.outputs.backend-image }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -105,6 +106,7 @@ jobs:
           context: ./frontend
           file: ./frontend/.Dockerfile
           push: ${{ inputs.push-images }}
+          load: ${{ !inputs.push-images }}
           tags: ${{ steps.image-tags.outputs.frontend-image }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
