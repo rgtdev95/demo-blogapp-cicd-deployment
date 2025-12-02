@@ -28,9 +28,7 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
 
     model_config = SettingsConfigDict(
-        env_file=".env",
-        case_sensitive=True,
-        extra="ignore"  # Allow extra env vars not defined in Settings
+        env_file=".env", case_sensitive=True, extra="ignore"  # Allow extra env vars not defined in Settings
     )
 
 

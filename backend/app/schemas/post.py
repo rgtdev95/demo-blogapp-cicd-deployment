@@ -3,13 +3,16 @@ from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+
 class TagBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=50)
+
 
 class TagResponse(TagBase):
     id: int
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class PostBase(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
@@ -21,8 +24,10 @@ class PostBase(BaseModel):
     is_draft: bool = True
     tags: List[str] = []
 
+
 class PostCreate(PostBase):
     pass
+
 
 class PostUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
@@ -34,12 +39,14 @@ class PostUpdate(BaseModel):
     is_draft: Optional[bool] = None
     tags: Optional[List[str]] = None
 
+
 class AuthorInfo(BaseModel):
     id: int
     name: str
     avatar: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class PostResponse(PostBase):
     id: int
@@ -53,6 +60,7 @@ class PostResponse(PostBase):
     comments_count: int = 0
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class PostListResponse(BaseModel):
     posts: List[PostResponse]
