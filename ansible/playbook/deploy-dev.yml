@@ -157,15 +157,49 @@
       when: start_result.stdout_lines is defined
 
     # ===== Health Checks =====
-    - name: Wait for database to be healthy
+    - name: Wait for MySQL container to be ready
+      command: docker exec blogapp_mysql mysqladmin ping -h localhost
+      register: mysql_ready
+      retries: 18
+      delay: 10
+      until: mysql_ready.rc == 0
+      changed_when: false
+
+    # ===== Ensure MySQL User Exists =====
+    - name: Check if MySQL user exists
+      command: >
+        docker exec blogapp_mysql mysql -u root -p{{ mysql_root_password }}
+        -e "SELECT User FROM mysql.user WHERE User='{{ mysql_user }}';"
+      register: user_check
+      changed_when: false
+      failed_when: false
+
+    - name: Create MySQL user if not exists
+      command: >
+        docker exec blogapp_mysql mysql -u root -p{{ mysql_root_password }}
+        -e "CREATE USER IF NOT EXISTS '{{ mysql_user }}'@'%' IDENTIFIED WITH mysql_native_password BY '{{ mysql_password }}';
+        GRANT ALL PRIVILEGES ON {{ mysql_database }}.* TO '{{ mysql_user }}'@'%';
+        FLUSH PRIVILEGES;"
+      when: user_check.stdout.find(mysql_user) == -1
+      register: user_created
+
+    - name: Display user creation result
+      debug:
+        msg: "{{ 'MySQL user created successfully' if user_created.changed else 'MySQL user already exists' }}"
+
+    - name: Verify user can connect
       command: >
         docker exec blogapp_mysql mysqladmin ping 
         -h localhost -u {{ mysql_user }} -p{{ mysql_password }}
       register: db_health
-      retries: 12
-      delay: 10
+      retries: 3
+      delay: 5
       until: db_health.rc == 0
       changed_when: false
+
+    - name: Restart backend after user creation
+      command: docker restart blogapp-backend
+      when: user_created.changed
       ignore_errors: true
 
     - name: Wait for backend to be healthy
