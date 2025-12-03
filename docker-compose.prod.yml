@@ -1,7 +1,7 @@
 services:
   nginx:
     image: nginx:alpine
-    container_name: blogapp-nginx-prod
+    container_name: blogapp-nginx
     ports:
       - "80:80"
       - "443:443"
@@ -29,7 +29,7 @@ services:
 
   mysql:
     image: mysql:8.0
-    container_name: blogapp_mysql_prod
+    container_name: blogapp_mysql
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
@@ -53,7 +53,7 @@ services:
 
   phpmyadmin:
     image: phpmyadmin:latest
-    container_name: blogapp_phpmyadmin_prod
+    container_name: blogapp_phpmyadmin
     restart: unless-stopped
     environment:
       PMA_HOST: mysql
@@ -74,7 +74,7 @@ services:
   backend:
     # Production images with version tags
     image: ghcr.io/${GITHUB_REPOSITORY_OWNER}/blogapp-backend:latest
-    container_name: blogapp-backend-prod
+    container_name: blogapp-backend
     env_file:
       - .env
     entrypoint: ["./entrypoint.sh"]
@@ -82,7 +82,7 @@ services:
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     environment:
-      - DATABASE_URL=mysql+aiomysql://${MYSQL_USER}:${MYSQL_PASSWORD}@blogapp_mysql_prod:3306/${MYSQL_DATABASE}
+      - DATABASE_URL=mysql+aiomysql://${MYSQL_USER}:${MYSQL_PASSWORD}@blogapp_mysql:3306/${MYSQL_DATABASE}
       - DEBUG=False
       - LOG_LEVEL=info
     volumes:
@@ -110,7 +110,7 @@ services:
   frontend:
     # Production images with version tags
     image: ghcr.io/${GITHUB_REPOSITORY_OWNER}/blogapp-frontend:latest
-    container_name: blogapp-frontend-prod
+    container_name: blogapp-frontend
     ports:
       - "8081:80"
     environment:
