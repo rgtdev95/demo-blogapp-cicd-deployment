@@ -5,7 +5,7 @@ all:
         dev-server:
           ansible_host: "{{ DEV_SERVER_IP }}"
           ansible_user: "{{ DEV_SERVER_USER }}"
-          ansible_ssh_private_key_file: ~/.ssh/id_rsa
+          ansible_ssh_private_key_file: ~/.ssh/id_ed25519
           ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
           
           # Environment Configuration
@@ -24,8 +24,9 @@ all:
           ssl_enabled: false
           
           # API Configuration
-          api_url: "https://dev-blogapp.internal.rtg-homelabs.tech"
+          api_url: "{{ DEV_API_URL | default('https://dev-blogapp.internal.rtg-homelabs.tech') }}"
           cors_origins: 
             - "http://{{ DEV_SERVER_IP }}"
             - "http://{{ DEV_SERVER_IP }}:8081"
-            - "https://dev-blogapp.internal.rtg-homelabs.tech"
+            - "{{ DEV_API_URL | default('https://dev-blogapp.internal.rtg-homelabs.tech') }}"
+
