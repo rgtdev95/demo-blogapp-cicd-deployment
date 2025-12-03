@@ -5,7 +5,7 @@ all:
         prod-server:
           ansible_host: "{{ PROD_SERVER_IP }}"
           ansible_user: "{{ PROD_SERVER_USER }}"
-          ansible_ssh_private_key_file: ~/.ssh/id_rsa_prod
+          ansible_ssh_private_key_file: ~/.ssh/id_ed25519_prod
           ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
           
           # Environment Configuration
@@ -25,10 +25,10 @@ all:
           ssl_enabled: true
           
           # Production Configuration
-          domain_name: "{{ PROD_DOMAIN_NAME | default('blog.yourdomain.com') }}"
-          api_url: "{{ PROD_API_URL | default('https://blog.yourdomain.com') }}"
+          domain_name: "{{ PROD_DOMAIN_NAME | default('https://prod-blogapp.internal.rtg-homelabs.tech/') }}"
+          api_url: "{{ PROD_API_URL | default('https://prod-blogapp.internal.rtg-homelabs.tech/') }}"
           cors_origins:
-            - "https://{{ PROD_DOMAIN_NAME | default('blog.yourdomain.com') }}"
+            - "https://{{ PROD_DOMAIN_NAME | default('prod-blogapp.internal.rtg-homelabs.tech') }}"
             - "http://{{ PROD_SERVER_IP }}"
           
           # Monitoring Ports
