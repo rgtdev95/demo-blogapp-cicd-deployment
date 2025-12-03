@@ -92,14 +92,14 @@
         content: |
           # Development Environment Configuration
           # Generated: {{ ansible_date_time.iso8601 }}
-          
+
           # Database Configuration
           MYSQL_ROOT_PASSWORD={{ mysql_root_password }}
           MYSQL_DATABASE={{ mysql_database }}
           MYSQL_USER={{ mysql_user }}
           MYSQL_PASSWORD={{ mysql_password }}
           MYSQL_PORT=3306
-          
+
           # Backend Configuration
           DATABASE_URL=mysql+aiomysql://{{ mysql_user }}:{{ mysql_password }}@blogapp_mysql:3306/{{ mysql_database }}
           SECRET_KEY={{ secret_key }}
@@ -111,10 +111,10 @@
           API_PREFIX=/api
           PORT=8000
           BACKEND_PORT={{ backend_port }}
-          
+
           # PhpMyAdmin
           PHPMYADMIN_PORT={{ phpmyadmin_port }}
-          
+
           # Docker Configuration
           GITHUB_REPOSITORY_OWNER={{ github_repository_owner }}
         owner: "{{ ansible_user }}"
@@ -157,16 +157,25 @@
       when: start_result.stdout_lines is defined
 
     # ===== Health Checks =====
-    - name: Wait for database to be healthy
-      command: >
-        docker exec blogapp_mysql mysqladmin ping 
-        -h localhost -u {{ mysql_user }} -p{{ mysql_password }}
-      register: db_health
-      retries: 12
+    - name: Wait for MySQL container to be ready
+      command: docker exec blogapp_mysql mysqladmin ping -h localhost -u root -p{{ mysql_root_password }}
+      register: mysql_ready
+      retries: 20
       delay: 10
-      until: db_health.rc == 0
+      until: mysql_ready.rc == 0
       changed_when: false
-      ignore_errors: true
+
+    - name: Verify MySQL user was created by init script
+      command: >
+        docker exec blogapp_mysql mysql -u root -p{{ mysql_root_password }}
+        -e "SELECT User, Host, plugin FROM mysql.user WHERE User='{{ mysql_user }}';"
+      register: user_verification
+      changed_when: false
+      failed_when: false
+
+    - name: Display user verification result
+      debug:
+        var: user_verification.stdout_lines
 
     - name: Wait for backend to be healthy
       uri:

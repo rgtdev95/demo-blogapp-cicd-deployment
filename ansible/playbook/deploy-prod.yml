@@ -1,0 +1,332 @@
+---
+# Production Deployment Playbook
+- name: Deploy Blog App to Production Server
+  hosts: prod
+  become: true
+  vars:
+    project_dir: /opt/blogapp-prod
+    network_name: blogapp_network
+    backup_dir: /opt/backups/blogapp
+
+  tasks:
+    # ===== Pre-deployment Backup =====
+    - name: Create backup directory
+      file:
+        path: "{{ backup_dir }}"
+        state: directory
+        mode: "0755"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+
+    - name: Backup current deployment (if exists)
+      block:
+        - name: Check if deployment exists
+          stat:
+            path: "{{ project_dir }}/docker-compose.yml"
+          register: deployment_exists
+
+        - name: Create backup of current deployment
+          ansible.builtin.archive:
+            path: "{{ project_dir }}"
+            dest: "{{ backup_dir }}/backup-{{ ansible_date_time.iso8601_basic_short }}.tar.gz"
+            format: gz
+          when: deployment_exists.stat.exists
+      rescue:
+        - name: Backup failed - continuing anyway
+          debug:
+            msg: "Backup failed but continuing with deployment"
+
+    # ===== Docker Network Setup =====
+    - name: Create Docker network
+      community.docker.docker_network:
+        name: "{{ network_name }}"
+        state: present
+      register: network_result
+      ignore_errors: true
+
+    - name: Display network status
+      debug:
+        msg: "Docker network '{{ network_name }}' {{ 'created' if network_result.changed else 'already exists' }}"
+
+    # ===== Directory Setup =====
+    - name: Create project directory
+      file:
+        path: "{{ project_dir }}"
+        state: directory
+        mode: "0755"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+
+    - name: Create required subdirectories
+      file:
+        path: "{{ project_dir }}/{{ item }}"
+        state: directory
+        mode: "0755"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+      loop:
+        - conf.d
+        - logs
+        - ssl
+        - uploads
+        - nginx
+        - prometheus
+        - grafana
+
+    - name: Set uploads directory permissions
+      file:
+        path: "{{ project_dir }}/uploads"
+        state: directory
+        mode: "0777"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+
+    # ===== Copy Configuration Files =====
+    - name: Copy Docker Compose file
+      copy:
+        src: ../../docker-compose.prod.yml
+        dest: "{{ project_dir }}/docker-compose.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0644"
+
+    - name: Copy Nginx main configuration
+      copy:
+        src: ../../docker-apps/nginx/nginx.conf
+        dest: "{{ project_dir }}/nginx/nginx.conf"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0644"
+
+    - name: Copy Nginx server configuration
+      copy:
+        src: ../../docker-apps/nginx/conf.d/docker.conf
+        dest: "{{ project_dir }}/conf.d/docker.conf"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0644"
+
+    - name: Copy database init script (if exists)
+      copy:
+        src: ../../docker-apps/database/init.sql
+        dest: "{{ project_dir }}/init.sql"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0644"
+      ignore_errors: true
+
+    - name: Copy monitoring configurations
+      copy:
+        src: "../../monitoring/{{ item }}"
+        dest: "{{ project_dir }}/{{ item }}"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0644"
+      loop:
+        - prometheus.yml
+      ignore_errors: true
+
+    # ===== Create Environment File =====
+    - name: Create .env file from secrets
+      copy:
+        dest: "{{ project_dir }}/.env"
+        content: |
+          # Production Environment Configuration
+          # Generated: {{ ansible_date_time.iso8601 }}
+          # Version: {{ app_version }}
+
+          # Database Configuration
+          MYSQL_ROOT_PASSWORD={{ mysql_root_password }}
+          MYSQL_DATABASE={{ mysql_database }}
+          MYSQL_USER={{ mysql_user }}
+          MYSQL_PASSWORD={{ mysql_password }}
+          MYSQL_PORT=3306
+
+          # Backend Configuration
+          DATABASE_URL=mysql+aiomysql://{{ mysql_user }}:{{ mysql_password }}@blogapp_mysql:3306/{{ mysql_database }}
+          SECRET_KEY={{ secret_key }}
+          ALGORITHM=HS256
+          ACCESS_TOKEN_EXPIRE_MINUTES=30
+          CORS_ORIGINS=https://{{ domain_name }},http://{{ PROD_SERVER_IP }}
+          STATIC_URL=https://{{ domain_name }}
+          DEBUG=False
+          API_PREFIX=/api
+          PORT=8000
+          BACKEND_PORT={{ backend_port }}
+
+          # Production Domain
+          DOMAIN_NAME={{ domain_name }}
+
+          # PhpMyAdmin
+          PHPMYADMIN_PORT={{ phpmyadmin_port }}
+
+          # Redis Configuration
+          REDIS_PASSWORD={{ redis_password }}
+          REDIS_PORT=6379
+
+          # Monitoring
+          GRAFANA_ADMIN_PASSWORD={{ grafana_admin_password }}
+
+          # Docker Configuration
+          GITHUB_REPOSITORY_OWNER={{ github_repository_owner }}
+
+          # Application Version
+          APP_VERSION={{ app_version }}
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0600"
+
+    # ===== Docker Operations =====
+    - name: Log in to GitHub Container Registry
+      community.docker.docker_login:
+        registry: ghcr.io
+        username: "{{ github_actor }}"
+        password: "{{ github_token }}"
+
+    - name: Pull latest images
+      command: docker compose pull
+      args:
+        chdir: "{{ project_dir }}"
+      register: pull_result
+
+    - name: Display pulled images
+      debug:
+        var: pull_result.stdout_lines
+      when: pull_result.stdout_lines is defined
+
+    - name: Stop existing containers gracefully
+      command: docker compose down --timeout 60
+      args:
+        chdir: "{{ project_dir }}"
+      ignore_errors: true
+
+    - name: Start containers
+      command: docker compose up -d --remove-orphans
+      args:
+        chdir: "{{ project_dir }}"
+      register: start_result
+
+    - name: Display startup result
+      debug:
+        var: start_result.stdout_lines
+      when: start_result.stdout_lines is defined
+
+    # ===== Health Checks =====
+    - name: Wait for MySQL container to be ready
+      command: docker exec blogapp_mysql_prod mysqladmin ping -h localhost -u root -p{{ mysql_root_password }}
+      register: mysql_ready
+      retries: 20
+      delay: 10
+      until: mysql_ready.rc == 0
+      changed_when: false
+
+    - name: Verify MySQL user was created by init script
+      command: >
+        docker exec blogapp_mysql_prod mysql -u root -p{{ mysql_root_password }}
+        -e "SELECT User, Host, plugin FROM mysql.user WHERE User='{{ mysql_user }}';"
+      register: user_verification
+      changed_when: false
+      failed_when: false
+
+    - name: Display user verification result
+      debug:
+        var: user_verification.stdout_lines
+
+    - name: Wait for backend to be healthy
+      uri:
+        url: "http://localhost:{{ backend_port }}/health"
+        method: GET
+        timeout: 10
+      register: backend_health
+      retries: 18
+      delay: 10
+      until: backend_health.status == 200
+      changed_when: false
+      ignore_errors: true
+
+    - name: Display backend health status
+      debug:
+        msg: "{{ 'Backend is healthy ✓' if backend_health.status == 200 else 'Backend health check failed ✗' }}"
+
+    - name: Get container status
+      command: docker ps --format "table {% raw %}{{.Names}}\t{{.Status}}\t{{.Ports}}{% endraw %}"
+      register: container_status
+      changed_when: false
+
+    - name: Display container status
+      debug:
+        msg: "{{ container_status.stdout_lines }}"
+
+    # ===== Post-Deployment Tasks =====
+    - name: Prune unused images
+      command: docker image prune -f
+      ignore_errors: true
+
+    - name: Remove old backups (keep last 30 days)
+      find:
+        paths: "{{ backup_dir }}"
+        patterns: "backup-*.tar.gz"
+        age: "30d"
+      register: old_backups
+
+    - name: Delete old backups
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ old_backups.files }}"
+      when: old_backups.files | length > 0
+      ignore_errors: true
+
+    # ===== Deployment Summary =====
+    - name: Display deployment summary
+      debug:
+        msg:
+          - "🎉 Production Deployment Completed!"
+          - "Version: {{ app_version }}"
+          - "Domain: https://{{ domain_name }}"
+          - "Backend Health: http://{{ PROD_SERVER_IP }}:{{ backend_port }}/health"
+          - "API Docs: http://{{ PROD_SERVER_IP }}:{{ backend_port }}/api/docs"
+          - "phpMyAdmin: http://{{ PROD_SERVER_IP }}:{{ phpmyadmin_port }}"
+          - "Grafana: http://{{ PROD_SERVER_IP }}:3001"
+          - "Prometheus: http://{{ PROD_SERVER_IP }}:9090"
+          - ""
+          - "📋 Check logs: docker logs <container_name>"
+          - "💾 Backup saved to: {{ backup_dir }}"
+
+    # ===== Rollback Information =====
+    - name: Create rollback script
+      copy:
+        dest: "{{ project_dir }}/rollback.sh"
+        content: |
+          #!/bin/bash
+          # Rollback script for emergency use
+          # Usage: sudo bash rollback.sh
+
+          echo "🔄 Rolling back to previous deployment..."
+
+          # Find latest backup
+          LATEST_BACKUP=$(ls -t {{ backup_dir }}/backup-*.tar.gz | head -1)
+
+          if [ -z "$LATEST_BACKUP" ]; then
+            echo "❌ No backup found!"
+            exit 1
+          fi
+
+          echo "📦 Found backup: $LATEST_BACKUP"
+
+          # Stop current deployment
+          cd {{ project_dir }}
+          docker compose down --timeout 60
+
+          # Restore backup
+          cd /opt
+          tar -xzf "$LATEST_BACKUP"
+
+          # Start restored deployment
+          cd {{ project_dir }}
+          docker compose up -d
+
+          echo "✅ Rollback complete!"
+        mode: "0755"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"

@@ -51,6 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      packages: write
     outputs:
       backend-image: ${{ steps.image-tags.outputs.backend-image }}
       frontend-image: ${{ steps.image-tags.outputs.frontend-image }}
@@ -86,7 +87,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Backend Image
         uses: docker/build-push-action@v5

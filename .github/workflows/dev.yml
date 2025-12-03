@@ -34,7 +34,7 @@ jobs:
       backend-size-limit-mb: 500
       frontend-size-limit-mb: 150
       build-args-frontend: |
-        VITE_API_URL=https://dev-blogapp.internal.rtg-homelabs.tech
+        VITE_API_URL=${{ vars.DEV_API_URL || 'https://dev-blogapp.internal.rtg-homelabs.tech' }}
         VITE_APP_ENV=production
     secrets: inherit
 
@@ -44,6 +44,7 @@ jobs:
     needs: build-and-push
     runs-on: self-hosted # ← CRITICAL: must be your on-premise runner
     timeout-minutes: 15
+    environment: development
     if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
     steps:
       - uses: actions/checkout@v4
@@ -58,8 +59,8 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh/
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
+          echo "${{ secrets.DEV_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H ${{ secrets.DEV_SERVER_IP }} >> ~/.ssh/known_hosts
 
       - name: Run Ansible Playbook
@@ -67,16 +68,16 @@ jobs:
           ANSIBLE_HOST_KEY_CHECKING: "False"
         run: |
           cd ansible
-          ansible-playbook -i inventory/dev.yml playbook/deploy-dev-simple.yml \
+          ansible-playbook -i inventory/dev.yml playbook/deploy-dev.yml \
             -e "DEV_SERVER_IP=${{ secrets.DEV_SERVER_IP }}" \
             -e "DEV_SERVER_USER=${{ secrets.DEV_SERVER_USER }}" \
-            -e "mysql_root_password=${{ secrets.MYSQL_ROOT_PASSWORD }}" \
-            -e "mysql_database=${{ secrets.MYSQL_DATABASE }}" \
-            -e "mysql_user=${{ secrets.MYSQL_USER }}" \
-            -e "mysql_password=${{ secrets.MYSQL_PASSWORD }}" \
-            -e "secret_key=${{ secrets.SECRET_KEY }}" \
-            -e "backend_port=${{ vars.BACKEND_PORT || '8000' }}" \
-            -e "phpmyadmin_port=${{ vars.PHPMYADMIN_PORT || '8080' }}" \
+            -e "mysql_root_password=${{ secrets.DEV_MYSQL_ROOT_PASSWORD }}" \
+            -e "mysql_database=${{ secrets.DEV_MYSQL_DATABASE }}" \
+            -e "mysql_user=${{ secrets.DEV_MYSQL_USER }}" \
+            -e "mysql_password=${{ secrets.DEV_MYSQL_PASSWORD }}" \
+            -e "secret_key=${{ secrets.DEV_SECRET_KEY }}" \
+            -e "backend_port=${{ vars.DEV_BACKEND_PORT || '8000' }}" \
+            -e "phpmyadmin_port=${{ vars.DEV_PHPMYADMIN_PORT || '8080' }}" \
             -e "github_repository_owner=${{ github.repository_owner }}" \
             -e "github_actor=${{ github.actor }}" \
             -e "github_token=${{ secrets.GITHUB_TOKEN }}" \
